@@ -45,35 +45,40 @@ export default function DashboardSuperAdmin() {
     setSuccesso('');
     setCreandoAdmin(true);
 
-    const { data: { session } } = await supabase.auth.getSession();
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
 
-    const risposta = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/crea-utente`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({
-        email: emailAdmin,
-        password: passwordAdmin,
-        nome: nomeAdmin,
-        ruolo: 'admin_azienda',
-        azienda_id: aziendaSelezionata,
-      }),
-    });
+      const risposta = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/crea-utente`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          email: emailAdmin,
+          password: passwordAdmin,
+          nome: nomeAdmin,
+          ruolo: 'admin_azienda',
+          azienda_id: aziendaSelezionata,
+        }),
+      });
 
-    const risultato = await risposta.json();
-    setCreandoAdmin(false);
+      const risultato = await risposta.json();
 
-    if (!risposta.ok) {
-      setErrore(risultato.errore || 'Errore nella creazione dell\'admin.');
-      return;
+      if (!risposta.ok) {
+        setErrore(risultato.errore || 'Errore nella creazione dell\'admin.');
+        return;
+      }
+
+      setSuccesso('Amministratore azienda creato con successo.');
+      setNomeAdmin('');
+      setEmailAdmin('');
+      setPasswordAdmin('');
+    } catch (err) {
+      setErrore('Errore di connessione alla funzione di creazione utente: ' + err.message);
+    } finally {
+      setCreandoAdmin(false);
     }
-
-    setSuccesso('Amministratore azienda creato con successo.');
-    setNomeAdmin('');
-    setEmailAdmin('');
-    setPasswordAdmin('');
   }
 
   if (loading || !profile) return <div className="container">Caricamento…</div>;

@@ -76,36 +76,41 @@ export default function DashboardAdminAzienda() {
     setSuccesso('');
     setCreandoUtente(true);
 
-    const { data: { session } } = await supabase.auth.getSession();
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
 
-    const risposta = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/crea-utente`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({
-        email: emailUtente,
-        password: passwordUtente,
-        nome: nomeUtente,
-        ruolo: 'utente_studio',
-        azienda_id: profile.azienda_id,
-        studio_id: studioSelezionato,
-      }),
-    });
+      const risposta = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/crea-utente`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          email: emailUtente,
+          password: passwordUtente,
+          nome: nomeUtente,
+          ruolo: 'utente_studio',
+          azienda_id: profile.azienda_id,
+          studio_id: studioSelezionato,
+        }),
+      });
 
-    const risultato = await risposta.json();
-    setCreandoUtente(false);
+      const risultato = await risposta.json();
 
-    if (!risposta.ok) {
-      setErrore(risultato.errore || 'Errore nella creazione dell\'utente.');
-      return;
+      if (!risposta.ok) {
+        setErrore(risultato.errore || 'Errore nella creazione dell\'utente.');
+        return;
+      }
+
+      setSuccesso('Utente studio creato con successo.');
+      setNomeUtente('');
+      setEmailUtente('');
+      setPasswordUtente('');
+    } catch (err) {
+      setErrore('Errore di connessione alla funzione di creazione utente: ' + err.message);
+    } finally {
+      setCreandoUtente(false);
     }
-
-    setSuccesso('Utente studio creato con successo.');
-    setNomeUtente('');
-    setEmailUtente('');
-    setPasswordUtente('');
   }
 
   if (loading || !profile) return <div className="container">Caricamento…</div>;

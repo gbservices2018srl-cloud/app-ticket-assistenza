@@ -7,14 +7,34 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
+// Header CORS: necessari perché il browser chiama questa funzione da un altro indirizzo
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+
+function jsonResponse(body, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+  });
+}
+
 Deno.serve(async (req) => {
+  // Il browser manda prima una richiesta "OPTIONS" di controllo (preflight):
+  // va sempre risposta subito con gli header CORS, senza altra logica.
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: CORS_HEADERS });
+  }
+
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ errore: 'Metodo non permesso' }), { status: 405 });
+    return jsonResponse({ errore: 'Metodo non permesso' }, 405);
   }
 
   const authHeader = req.headers.get('Authorization');
   if (!authHeader) {
-    return new Response(JSON.stringify({ errore: 'Non autenticato' }), { status: 401 });
+    return jsonResponse({ errore: 'Non autenticato' }, 401);
   }
 
   // Client "come utente chiamante" per verificare chi è
@@ -24,7 +44,7 @@ Deno.serve(async (req) => {
 
   const { data: { user } } = await supabaseUtente.auth.getUser();
   if (!user) {
-    return new Response(JSON.stringify({ errore: 'Token non valido' }), { status: 401 });
+    return jsonResponse({ errore: 'Token non valido' }, 401);
   }
 
   // Client con service role per operazioni admin
@@ -37,7 +57,7 @@ Deno.serve(async (req) => {
     .single();
 
   if (!profiloChiamante) {
-    return new Response(JSON.stringify({ errore: 'Profilo chiamante non trovato' }), { status: 403 });
+    return jsonResponse({ errore: 'Profilo chiamante non trovato' }, 403);
   }
 
   const body = await req.json();
@@ -46,14 +66,14 @@ Deno.serve(async (req) => {
   // Regole di autorizzazione
   if (profiloChiamante.ruolo === 'super_admin') {
     if (ruolo !== 'admin_azienda') {
-      return new Response(JSON.stringify({ errore: 'Il super admin può creare solo admin azienda' }), { status: 403 });
+      return jsonResponse({ errore: 'Il super admin può creare solo admin azienda' }, 403);
     }
   } else if (profiloChiamante.ruolo === 'admin_azienda') {
     if (ruolo !== 'utente_studio' || azienda_id !== profiloChiamante.azienda_id) {
-      return new Response(JSON.stringify({ errore: 'Puoi creare solo utenti studio della tua azienda' }), { status: 403 });
+      return jsonResponse({ errore: 'Puoi creare solo utenti studio della tua azienda' }, 403);
     }
   } else {
-    return new Response(JSON.stringify({ errore: 'Non autorizzato a creare utenti' }), { status: 403 });
+    return jsonResponse({ errore: 'Non autorizzato a creare utenti' }, 403);
   }
 
   // Crea l'utente in auth
@@ -64,7 +84,7 @@ Deno.serve(async (req) => {
   });
 
   if (erroreCreazione) {
-    return new Response(JSON.stringify({ errore: erroreCreazione.message }), { status: 400 });
+    return jsonResponse({ errore: erroreCreazione.message }, 400);
   }
 
   // Crea il profilo collegato
@@ -80,11 +100,8 @@ Deno.serve(async (req) => {
   if (erroreProfilo) {
     // rollback: elimina l'utente auth se il profilo fallisce
     await supabaseAdmin.auth.admin.deleteUser(nuovoUtente.user.id);
-    return new Response(JSON.stringify({ errore: erroreProfilo.message }), { status: 400 });
+    return jsonResponse({ errore: erroreProfilo.message }, 400);
   }
 
-  return new Response(JSON.stringify({ ok: true, utente_id: nuovoUtente.user.id }), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' },
-  });
+  return jsonResponse({ ok: true, utente_id: nuovoUtente.user.id });
 });
