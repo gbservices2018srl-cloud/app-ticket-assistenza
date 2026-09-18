@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
+import { creaClientPerNuovoUtente } from '../../lib/supabaseAdminClient';
 import { useProfile } from '../../lib/useProfile';
 import Navbar from '../../components/Navbar';
 
@@ -46,28 +47,29 @@ export default function DashboardSuperAdmin() {
     setCreandoAdmin(true);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-
-      const risposta = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/crea-utente`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          email: emailAdmin,
-          password: passwordAdmin,
-          nome: nomeAdmin,
-          ruolo: 'admin_azienda',
-          azienda_id: aziendaSelezionata,
-        }),
+      // 1. Crea l'utente su un client separato (non tocca la sessione del super admin)
+      const clientTemporaneo = creaClientPerNuovoUtente();
+      const { data: datiSignup, error: erroreSignup } = await clientTemporaneo.auth.signUp({
+        email: emailAdmin,
+        password: passwordAdmin,
       });
 
-      const risultato = await risposta.json();
+      if (erroreSignup) {
+        setErrore('Errore nella creazione dell\'account: ' + erroreSignup.message);
+        return;
+      }
 
-      if (!risposta.ok) {
-        setErrore(risultato.errore || 'Errore nella creazione dell\'admin.');
+      // 2. Collega il profilo (ruolo, nome, azienda) usando la sessione del super admin
+      const { error: erroreProfilo } = await supabase.from('profiles').insert({
+        id: datiSignup.user.id,
+        ruolo: 'admin_azienda',
+        nome: nomeAdmin,
+        azienda_id: aziendaSelezionata,
+        creato_da: profile.id,
+      });
+
+      if (erroreProfilo) {
+        setErrore('Account creato ma errore nel collegare il profilo: ' + erroreProfilo.message);
         return;
       }
 
@@ -76,7 +78,7 @@ export default function DashboardSuperAdmin() {
       setEmailAdmin('');
       setPasswordAdmin('');
     } catch (err) {
-      setErrore('Errore di connessione alla funzione di creazione utente: ' + err.message);
+      setErrore('Errore imprevisto: ' + err.message);
     } finally {
       setCreandoAdmin(false);
     }

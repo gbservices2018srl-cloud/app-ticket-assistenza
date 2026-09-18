@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
+import { creaClientPerNuovoUtente } from '../../lib/supabaseAdminClient';
 import { useProfile } from '../../lib/useProfile';
 import Navbar from '../../components/Navbar';
 import TicketList from '../../components/TicketList';
@@ -77,29 +78,30 @@ export default function DashboardAdminAzienda() {
     setCreandoUtente(true);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-
-      const risposta = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/crea-utente`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          email: emailUtente,
-          password: passwordUtente,
-          nome: nomeUtente,
-          ruolo: 'utente_studio',
-          azienda_id: profile.azienda_id,
-          studio_id: studioSelezionato,
-        }),
+      // 1. Crea l'utente su un client separato (non tocca la sessione dell'admin azienda)
+      const clientTemporaneo = creaClientPerNuovoUtente();
+      const { data: datiSignup, error: erroreSignup } = await clientTemporaneo.auth.signUp({
+        email: emailUtente,
+        password: passwordUtente,
       });
 
-      const risultato = await risposta.json();
+      if (erroreSignup) {
+        setErrore('Errore nella creazione dell\'account: ' + erroreSignup.message);
+        return;
+      }
 
-      if (!risposta.ok) {
-        setErrore(risultato.errore || 'Errore nella creazione dell\'utente.');
+      // 2. Collega il profilo (ruolo, nome, studio) usando la sessione dell'admin azienda
+      const { error: erroreProfilo } = await supabase.from('profiles').insert({
+        id: datiSignup.user.id,
+        ruolo: 'utente_studio',
+        nome: nomeUtente,
+        azienda_id: profile.azienda_id,
+        studio_id: studioSelezionato,
+        creato_da: profile.id,
+      });
+
+      if (erroreProfilo) {
+        setErrore('Account creato ma errore nel collegare il profilo: ' + erroreProfilo.message);
         return;
       }
 
@@ -108,7 +110,7 @@ export default function DashboardAdminAzienda() {
       setEmailUtente('');
       setPasswordUtente('');
     } catch (err) {
-      setErrore('Errore di connessione alla funzione di creazione utente: ' + err.message);
+      setErrore('Errore imprevisto: ' + err.message);
     } finally {
       setCreandoUtente(false);
     }
