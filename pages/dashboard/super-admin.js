@@ -52,6 +52,7 @@ export default function DashboardSuperAdmin() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
           Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
@@ -134,3 +135,4 @@ export default function DashboardSuperAdmin() {
     </div>
   );
 }
+Fix apikey header
