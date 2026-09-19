@@ -8,6 +8,7 @@ export default function DashboardStudio() {
   const { profile, loading, logout } = useProfile();
   const [tickets, setTickets] = useState([]);
   const [caricandoTickets, setCaricandoTickets] = useState(true);
+  const [filtroStato, setFiltroStato] = useState('tutti');
 
   const [tipo, setTipo] = useState('problema_generico');
   const [titolo, setTitolo] = useState('');
@@ -19,15 +20,19 @@ export default function DashboardStudio() {
 
   useEffect(() => {
     if (profile) caricaTickets();
-  }, [profile]);
+  }, [profile, filtroStato]);
 
   async function caricaTickets() {
     setCaricandoTickets(true);
-    const { data } = await supabase
+    let query = supabase
       .from('tickets')
       .select('*')
       .eq('studio_id', profile.studio_id)
       .order('creato_il', { ascending: false });
+
+    if (filtroStato !== 'tutti') query = query.eq('stato', filtroStato);
+
+    const { data } = await query;
     setTickets(data || []);
     setCaricandoTickets(false);
   }
@@ -130,6 +135,27 @@ export default function DashboardStudio() {
 
         <div className="card">
           <h2 style={{ marginTop: 0, fontSize: 18 }}>I tuoi ticket</h2>
+          <div style={{ marginBottom: 12 }}>
+            {[
+              { valore: 'tutti', etichetta: 'Tutti' },
+              { valore: 'aperto', etichetta: 'Aperti' },
+              { valore: 'in_lavorazione', etichetta: 'In lavorazione' },
+              { valore: 'risolto', etichetta: 'Risolti' },
+            ].map(t => (
+              <span
+                key={t.valore}
+                onClick={() => setFiltroStato(t.valore)}
+                style={{
+                  display: 'inline-block', padding: '8px 14px', borderRadius: 999, fontSize: 13,
+                  fontWeight: 600, cursor: 'pointer', marginRight: 8, marginBottom: 8,
+                  background: filtroStato === t.valore ? '#2563eb' : '#eef0f3',
+                  color: filtroStato === t.valore ? 'white' : '#1a1a1a',
+                }}
+              >
+                {t.etichetta}
+              </span>
+            ))}
+          </div>
           {caricandoTickets ? <p>Caricamento…</p> : <TicketList tickets={tickets} />}
         </div>
       </div>

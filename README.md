@@ -20,6 +20,10 @@ Ogni ticket mostra sempre la **data di apertura**.
    - `Project URL` → useremo come `NEXT_PUBLIC_SUPABASE_URL`
    - `anon public key` → useremo come `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
+### Se hai già un progetto esistente (aggiornamento)
+
+Se il tuo progetto Supabase esiste già (schema installato in precedenza), esegui anche lo script `aggiornamento-schema.sql` (fornito a parte) su **SQL Editor**: aggiunge la colonna email ai profili, i permessi di eliminazione e abilita il realtime per le notifiche. Non tocca i dati esistenti.
+
 ### ⚠️ Passaggio fondamentale: disattiva la conferma email
 
 Poiché gli account vengono creati dagli admin per conto di altre persone (che potrebbero non controllare subito la mail), va disattivata la richiesta di conferma email:
@@ -75,6 +79,16 @@ Ogni volta che modifichi un file su GitHub (tramite upload/modifica dal sito), R
 ## App installabile (PWA)
 
 L'app è configurata come Progressive Web App: una volta online su Render (HTTPS automatico), può essere "installata" su telefono e computer, con icona propria e senza barra del browser. Manifest, icone e service worker sono già inclusi, nessuna configurazione aggiuntiva richiesta (attivo solo nella build di produzione, non in `npm run dev`).
+
+## Notifiche di nuovo ticket
+
+L'admin azienda vede un bottone "Attiva notifiche": una volta concesso il permesso del browser, ogni nuovo ticket della propria azienda fa comparire una notifica di sistema sul device — **mentre l'app è aperta** (anche minimizzata o in un'altra scheda/finestra). Non funziona ad app completamente chiusa: quello richiederebbe un sistema di push notification con backend dedicato (VAPID), non incluso in questa versione.
+
+## Gestione utenze (Super Admin e Admin Azienda)
+
+- **Super Admin**: nella dashboard vede l'elenco di tutti gli amministratori azienda e utenti studio, può modificarne il nome, inviare un'email di reset password, eliminare l'accesso (con richiesta di conferma), ed eliminare intere aziende (con richiesta di conferma — elimina a cascata studi, utenti e ticket collegati).
+- **Admin Azienda**: dentro il pannello "Set up" può modificare il nome e resettare la password degli utenti studio che ha creato, oltre a eliminarne l'accesso.
+- Il **reset password** invia un'email con un link (pagina `/reset-password` inclusa nel progetto) che permette all'utente di impostare una nuova password da solo. Funziona solo per utenti creati **dopo** questo aggiornamento (serve l'email salvata nel profilo) — chi era stato creato prima non ha l'email salvata e va ricreato, oppure gli va assegnata manualmente da SQL Editor: `update public.profiles set email = 'indirizzo@esempio.it' where id = 'UUID-UTENTE';`
 
 ---
 

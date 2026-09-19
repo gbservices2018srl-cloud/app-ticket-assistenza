@@ -33,6 +33,7 @@ create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   ruolo text not null check (ruolo in ('super_admin', 'admin_azienda', 'utente_studio')),
   nome text not null,
+  email text,
   azienda_id uuid references public.aziende(id) on delete set null,
   studio_id uuid references public.studi(id) on delete set null,
   creato_da uuid references public.profiles(id),
@@ -297,3 +298,26 @@ using (
   bucket_id = 'allegati-ticket'
   and auth.role() = 'authenticated'
 );
+
+-- ------------------------------------------------------------
+-- PERMESSI DI ELIMINAZIONE (profili, studi, aziende)
+-- ------------------------------------------------------------
+create policy "aziende_delete" on public.aziende for delete
+using (public.mio_ruolo() = 'super_admin');
+
+create policy "studi_delete" on public.studi for delete
+using (
+  public.mio_ruolo() = 'super_admin'
+  or (public.mio_ruolo() = 'admin_azienda' and azienda_id = public.mia_azienda())
+);
+
+create policy "profiles_delete" on public.profiles for delete
+using (
+  public.mio_ruolo() = 'super_admin'
+  or (public.mio_ruolo() = 'admin_azienda' and azienda_id = public.mia_azienda() and ruolo = 'utente_studio')
+);
+
+-- ------------------------------------------------------------
+-- REALTIME (necessario per le notifiche di nuovo ticket)
+-- ------------------------------------------------------------
+alter publication supabase_realtime add table public.tickets;

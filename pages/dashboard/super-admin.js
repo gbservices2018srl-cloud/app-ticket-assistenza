@@ -7,6 +7,7 @@ import Navbar from '../../components/Navbar';
 export default function DashboardSuperAdmin() {
   const { profile, loading, logout } = useProfile();
   const [aziende, setAziende] = useState([]);
+  const [utenti, setUtenti] = useState([]);
   const [nomeAzienda, setNomeAzienda] = useState('');
   const [errore, setErrore] = useState('');
   const [successo, setSuccesso] = useState('');
@@ -17,13 +18,28 @@ export default function DashboardSuperAdmin() {
   const [passwordAdmin, setPasswordAdmin] = useState('');
   const [creandoAdmin, setCreandoAdmin] = useState(false);
 
+  const [modificaId, setModificaId] = useState(null);
+  const [nomeModificato, setNomeModificato] = useState('');
+
   useEffect(() => {
-    if (profile) caricaAziende();
+    if (profile) {
+      caricaAziende();
+      caricaUtenti();
+    }
   }, [profile]);
 
   async function caricaAziende() {
     const { data } = await supabase.from('aziende').select('*').order('creato_il', { ascending: false });
     setAziende(data || []);
+  }
+
+  async function caricaUtenti() {
+    const { data } = await supabase
+      .from('profiles')
+      .select('*, aziende(nome), studi(nome)')
+      .in('ruolo', ['admin_azienda', 'utente_studio'])
+      .order('creato_il', { ascending: false });
+    setUtenti(data || []);
   }
 
   async function creaAzienda(e) {
@@ -40,6 +56,27 @@ export default function DashboardSuperAdmin() {
     caricaAziende();
   }
 
+  async function eliminaAzienda(azienda) {
+    if (!confirm(`Eliminare definitivamente l'azienda "${azienda.nome}"? Verranno eliminati anche tutti i suoi studi, utenti e ticket collegati. Questa azione non è reversibile.`)) {
+      return;
+    }
+    setErrore('');
+    setSuccesso('');
+
+    // Elimina prima i profili collegati (admin azienda + utenti studio),
+    // poi l'azienda (che a cascata elimina studi e ticket)
+    await supabase.from('profiles').delete().eq('azienda_id', azienda.id);
+    const { error } = await supabase.from('aziende').delete().eq('id', azienda.id);
+
+    if (error) {
+      setErrore('Errore durante l\'eliminazione: ' + error.message);
+      return;
+    }
+    setSuccesso('Azienda eliminata.');
+    caricaAziende();
+    caricaUtenti();
+  }
+
   async function creaAdmin(e) {
     e.preventDefault();
     setErrore('');
@@ -47,7 +84,6 @@ export default function DashboardSuperAdmin() {
     setCreandoAdmin(true);
 
     try {
-      // 1. Crea l'utente su un client separato (non tocca la sessione del super admin)
       const clientTemporaneo = creaClientPerNuovoUtente();
       const { data: datiSignup, error: erroreSignup } = await clientTemporaneo.auth.signUp({
         email: emailAdmin,
@@ -59,11 +95,11 @@ export default function DashboardSuperAdmin() {
         return;
       }
 
-      // 2. Collega il profilo (ruolo, nome, azienda) usando la sessione del super admin
       const { error: erroreProfilo } = await supabase.from('profiles').insert({
         id: datiSignup.user.id,
         ruolo: 'admin_azienda',
         nome: nomeAdmin,
+        email: emailAdmin,
         azienda_id: aziendaSelezionata,
         creato_da: profile.id,
       });
@@ -77,6 +113,7 @@ export default function DashboardSuperAdmin() {
       setNomeAdmin('');
       setEmailAdmin('');
       setPasswordAdmin('');
+      caricaUtenti();
     } catch (err) {
       setErrore('Errore imprevisto: ' + err.message);
     } finally {
@@ -84,7 +121,60 @@ export default function DashboardSuperAdmin() {
     }
   }
 
+  function iniziaModifica(utente) {
+    setModificaId(utente.id);
+    setNomeModificato(utente.nome);
+  }
+
+  async function salvaModifica(utente) {
+    setErrore('');
+    setSuccesso('');
+    const { error } = await supabase.from('profiles').update({ nome: nomeModificato }).eq('id', utente.id);
+    if (error) {
+      setErrore(error.message);
+      return;
+    }
+    setModificaId(null);
+    setSuccesso('Nome aggiornato.');
+    caricaUtenti();
+  }
+
+  async function resettaPassword(utente) {
+    if (!utente.email) {
+      setErrore('Questo profilo non ha un\'email salvata (creato prima dell\'aggiornamento): non è possibile inviare il reset automatico.');
+      return;
+    }
+    setErrore('');
+    setSuccesso('');
+    const { error } = await supabase.auth.resetPasswordForEmail(utente.email, {
+      redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/reset-password` : undefined,
+    });
+    if (error) {
+      setErrore('Errore nell\'invio dell\'email di reset: ' + error.message);
+      return;
+    }
+    setSuccesso(`Email di reset password inviata a ${utente.email}.`);
+  }
+
+  async function eliminaUtente(utente) {
+    if (!confirm(`Eliminare l'accesso di "${utente.nome}" (${utente.email || 'nessuna email salvata'})? Non potrà più accedere all'app. Questa azione non è reversibile.`)) {
+      return;
+    }
+    setErrore('');
+    setSuccesso('');
+    const { error } = await supabase.from('profiles').delete().eq('id', utente.id);
+    if (error) {
+      setErrore(error.message);
+      return;
+    }
+    setSuccesso('Utente eliminato.');
+    caricaUtenti();
+  }
+
   if (loading || !profile) return <div className="container">Caricamento…</div>;
+
+  const amministratori = utenti.filter(u => u.ruolo === 'admin_azienda');
+  const utentiStudio = utenti.filter(u => u.ruolo === 'utente_studio');
 
   return (
     <div>
@@ -128,12 +218,91 @@ export default function DashboardSuperAdmin() {
           <h2 style={{ marginTop: 0, fontSize: 18 }}>Aziende registrate</h2>
           {aziende.length === 0 && <p style={{ color: '#6b7280' }}>Nessuna azienda ancora.</p>}
           {aziende.map(a => (
-            <div key={a.id} className="ticket-item">
-              <strong>{a.nome}</strong>
+            <div key={a.id} className="ticket-item" style={{ cursor: 'default' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <strong>{a.nome}</strong>
+                <button className="btn btn-danger" onClick={() => eliminaAzienda(a)} style={{ padding: '6px 12px', fontSize: 13 }}>
+                  Elimina
+                </button>
+              </div>
             </div>
           ))}
         </div>
+
+        <div className="card">
+          <h2 style={{ marginTop: 0, fontSize: 18 }}>Amministratori azienda</h2>
+          {amministratori.length === 0 && <p style={{ color: '#6b7280' }}>Nessun amministratore ancora.</p>}
+          {amministratori.map(u => (
+            <RigaUtente
+              key={u.id}
+              utente={u}
+              sottotitolo={u.aziende?.nome ? `Azienda: ${u.aziende.nome}` : ''}
+              inModifica={modificaId === u.id}
+              nomeModificato={nomeModificato}
+              onCambiaNome={setNomeModificato}
+              onIniziaModifica={() => iniziaModifica(u)}
+              onSalvaModifica={() => salvaModifica(u)}
+              onAnnullaModifica={() => setModificaId(null)}
+              onResetPassword={() => resettaPassword(u)}
+              onElimina={() => eliminaUtente(u)}
+            />
+          ))}
+        </div>
+
+        <div className="card">
+          <h2 style={{ marginTop: 0, fontSize: 18 }}>Utenti studio (tutte le aziende)</h2>
+          {utentiStudio.length === 0 && <p style={{ color: '#6b7280' }}>Nessun utente studio ancora.</p>}
+          {utentiStudio.map(u => (
+            <RigaUtente
+              key={u.id}
+              utente={u}
+              sottotitolo={[u.aziende?.nome, u.studi?.nome].filter(Boolean).join(' — ')}
+              inModifica={modificaId === u.id}
+              nomeModificato={nomeModificato}
+              onCambiaNome={setNomeModificato}
+              onIniziaModifica={() => iniziaModifica(u)}
+              onSalvaModifica={() => salvaModifica(u)}
+              onAnnullaModifica={() => setModificaId(null)}
+              onResetPassword={() => resettaPassword(u)}
+              onElimina={() => eliminaUtente(u)}
+            />
+          ))}
+        </div>
       </div>
+    </div>
+  );
+}
+
+function RigaUtente({
+  utente, sottotitolo, inModifica, nomeModificato, onCambiaNome,
+  onIniziaModifica, onSalvaModifica, onAnnullaModifica, onResetPassword, onElimina,
+}) {
+  return (
+    <div className="ticket-item" style={{ cursor: 'default' }}>
+      {inModifica ? (
+        <div>
+          <input value={nomeModificato} onChange={e => onCambiaNome(e.target.value)} style={{ marginBottom: 8 }} />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn" onClick={onSalvaModifica} style={{ padding: '6px 12px', fontSize: 13 }}>Salva</button>
+            <button className="btn btn-secondary" onClick={onAnnullaModifica} style={{ padding: '6px 12px', fontSize: 13 }}>Annulla</button>
+          </div>
+        </div>
+      ) : (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
+            <div>
+              <strong>{utente.nome}</strong>
+              {utente.email && <div style={{ fontSize: 13, color: '#6b7280' }}>{utente.email}</div>}
+              {sottotitolo && <div style={{ fontSize: 13, color: '#6b7280' }}>{sottotitolo}</div>}
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <button className="btn btn-secondary" onClick={onIniziaModifica} style={{ padding: '6px 12px', fontSize: 13 }}>Modifica nome</button>
+              <button className="btn btn-secondary" onClick={onResetPassword} style={{ padding: '6px 12px', fontSize: 13 }}>Reset password</button>
+              <button className="btn btn-danger" onClick={onElimina} style={{ padding: '6px 12px', fontSize: 13 }}>Elimina</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
