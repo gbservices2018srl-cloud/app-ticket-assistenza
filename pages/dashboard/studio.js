@@ -72,7 +72,10 @@ export default function DashboardStudio() {
       const percorso = `${nuovoTicket.id}/${Date.now()}_${foto.name}`;
       const { error: erroreUpload } = await supabase.storage
         .from('allegati-ticket')
-        .upload(percorso, foto);
+        .upload(percorso, foto, {
+          contentType: foto.type || 'application/octet-stream',
+          upsert: false,
+        });
 
       if (erroreUpload) {
         setErrore('Ticket creato ma errore nel caricamento della foto: ' + erroreUpload.message);

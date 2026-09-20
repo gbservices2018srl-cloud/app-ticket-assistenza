@@ -54,16 +54,18 @@ export default function DettaglioTicket() {
   }
 
   async function scaricaFoto(allegato) {
+    const nomeFile = allegato.storage_path.split('/').pop();
     const { data, error } = await supabase.storage
       .from('allegati-ticket')
-      .createSignedUrl(allegato.storage_path, 60);
+      .createSignedUrl(allegato.storage_path, 60, { download: nomeFile });
 
     if (error) {
       setErrore('Errore nel recupero della foto: ' + error.message);
       return;
     }
 
-    // Apre/scarica il file
+    // Con "download" impostato, il browser salva sempre il file
+    // invece di provare ad aprirlo/visualizzarlo nella scheda.
     window.open(data.signedUrl, '_blank');
 
     // Segna come scaricata
