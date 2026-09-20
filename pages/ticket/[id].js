@@ -135,6 +135,19 @@ export default function DettaglioTicket() {
     caricaTutto();
   }
 
+  async function eliminaTicket() {
+    if (!confirm('Eliminare definitivamente questo ticket? Verranno eliminate anche la soluzione e la cronologia collegate. Questa azione non è reversibile.')) {
+      return;
+    }
+    setErrore('');
+    const { error } = await supabase.from('tickets').delete().eq('id', id);
+    if (error) {
+      setErrore('Errore durante l\'eliminazione: ' + error.message);
+      return;
+    }
+    router.push(profile.ruolo === 'super_admin' ? '/dashboard/super-admin' : '/dashboard/admin-azienda');
+  }
+
   if (loading || !profile || !ticket) return <div className="container">Caricamento…</div>;
 
   return (
@@ -199,6 +212,15 @@ export default function DettaglioTicket() {
                 <p style={{ fontSize: 12, color: '#9ca3af', margin: 0 }}>Risolto il {formattaData(s.risolto_il)}</p>
               </div>
             ))}
+          </div>
+        )}
+
+        {isAmministrazione && ticket.stato === 'risolto' && (
+          <div className="card">
+            <h3 style={{ marginTop: 0, fontSize: 16 }}>Gestione ticket</h3>
+            <button className="btn btn-danger" onClick={eliminaTicket}>
+              Elimina ticket
+            </button>
           </div>
         )}
 

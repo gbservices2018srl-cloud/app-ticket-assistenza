@@ -317,6 +317,15 @@ using (
   or (public.mio_ruolo() = 'admin_azienda' and azienda_id = public.mia_azienda() and ruolo = 'utente_studio')
 );
 
+create policy "tickets_delete" on public.tickets for delete
+using (
+  stato = 'risolto'
+  and (
+    public.mio_ruolo() = 'super_admin'
+    or (public.mio_ruolo() = 'admin_azienda' and azienda_id = public.mia_azienda())
+  )
+);
+
 -- ------------------------------------------------------------
 -- REALTIME (necessario per le notifiche di nuovo ticket)
 -- ------------------------------------------------------------
