@@ -11,18 +11,27 @@ export default function DashboardSuperAdmin() {
   const [errore, setErrore] = useState('');
   const [successo, setSuccesso] = useState('');
 
-  // Azienda aperta (drill-down) e i suoi dati
+  // Livello 1: azienda aperta
   const [aziendaEspansa, setAziendaEspansa] = useState(null);
-  const [utentiAzienda, setUtentiAzienda] = useState([]);
+  const [amministratori, setAmministratori] = useState([]);
   const [studiAzienda, setStudiAzienda] = useState([]);
 
-  // Form "aggiungi utente" dentro l'azienda espansa
-  const [ruoloNuovo, setRuoloNuovo] = useState('utente_studio');
+  // Livello 2: amministratore aperto (dentro l'azienda)
+  const [adminEspanso, setAdminEspanso] = useState(null);
+  const [utentiStudio, setUtentiStudio] = useState([]);
+
+  // Form "aggiungi amministratore" (dentro l'azienda)
+  const [nomeAdmin, setNomeAdmin] = useState('');
+  const [emailAdmin, setEmailAdmin] = useState('');
+  const [passwordAdmin, setPasswordAdmin] = useState('');
+  const [creandoAdmin, setCreandoAdmin] = useState(false);
+
+  // Form "aggiungi utente studio" (dentro l'amministratore)
   const [studioNuovo, setStudioNuovo] = useState('');
-  const [nomeNuovo, setNomeNuovo] = useState('');
-  const [emailNuovo, setEmailNuovo] = useState('');
-  const [passwordNuovo, setPasswordNuovo] = useState('');
-  const [creando, setCreando] = useState(false);
+  const [nomeUtente, setNomeUtente] = useState('');
+  const [emailUtente, setEmailUtente] = useState('');
+  const [passwordUtente, setPasswordUtente] = useState('');
+  const [creandoUtente, setCreandoUtente] = useState(false);
 
   const [modificaId, setModificaId] = useState(null);
   const [nomeModificato, setNomeModificato] = useState('');
@@ -39,29 +48,55 @@ export default function DashboardSuperAdmin() {
   async function apriAzienda(azienda) {
     if (aziendaEspansa === azienda.id) {
       setAziendaEspansa(null);
+      setAdminEspanso(null);
       return;
     }
     setAziendaEspansa(azienda.id);
+    setAdminEspanso(null);
     setErrore('');
     setSuccesso('');
-    await caricaDatiAzienda(azienda.id);
+    await caricaAmministratori(azienda.id);
+    await caricaStudiAzienda(azienda.id);
   }
 
-  async function caricaDatiAzienda(aziendaId) {
-    const { data: utenti } = await supabase
+  async function caricaAmministratori(aziendaId) {
+    const { data } = await supabase
       .from('profiles')
-      .select('*, studi(nome)')
+      .select('*')
       .eq('azienda_id', aziendaId)
-      .order('ruolo', { ascending: true })
+      .eq('ruolo', 'admin_azienda')
       .order('creato_il', { ascending: false });
-    setUtentiAzienda(utenti || []);
+    setAmministratori(data || []);
+  }
 
-    const { data: studi } = await supabase
+  async function caricaStudiAzienda(aziendaId) {
+    const { data } = await supabase
       .from('studi')
       .select('*')
       .eq('azienda_id', aziendaId)
       .order('nome', { ascending: true });
-    setStudiAzienda(studi || []);
+    setStudiAzienda(data || []);
+  }
+
+  async function apriAdmin(admin) {
+    if (adminEspanso === admin.id) {
+      setAdminEspanso(null);
+      return;
+    }
+    setAdminEspanso(admin.id);
+    setErrore('');
+    setSuccesso('');
+    await caricaUtentiStudio(admin.azienda_id);
+  }
+
+  async function caricaUtentiStudio(aziendaId) {
+    const { data } = await supabase
+      .from('profiles')
+      .select('*, studi(nome)')
+      .eq('azienda_id', aziendaId)
+      .eq('ruolo', 'utente_studio')
+      .order('creato_il', { ascending: false });
+    setUtentiStudio(data || []);
   }
 
   async function creaAzienda(e) {
@@ -84,7 +119,6 @@ export default function DashboardSuperAdmin() {
     }
     setErrore('');
     setSuccesso('');
-
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const risposta = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/elimina-utente`, {
@@ -102,30 +136,24 @@ export default function DashboardSuperAdmin() {
         return;
       }
       setSuccesso('Azienda e tutti i suoi account eliminati.');
-      if (aziendaEspansa === azienda.id) setAziendaEspansa(null);
+      if (aziendaEspansa === azienda.id) { setAziendaEspansa(null); setAdminEspanso(null); }
       caricaAziende();
     } catch (err) {
       setErrore('Errore imprevisto: ' + err.message);
     }
   }
 
-  async function creaUtenteInAzienda(e) {
+  async function creaAdmin(e) {
     e.preventDefault();
     setErrore('');
     setSuccesso('');
-
-    if (ruoloNuovo === 'utente_studio' && !studioNuovo) {
-      setErrore('Seleziona uno studio per l\'utente studio.');
-      return;
-    }
-
-    setCreando(true);
+    setCreandoAdmin(true);
 
     try {
       const clientTemporaneo = creaClientPerNuovoUtente();
       const { data: datiSignup, error: erroreSignup } = await clientTemporaneo.auth.signUp({
-        email: emailNuovo,
-        password: passwordNuovo,
+        email: emailAdmin,
+        password: passwordAdmin,
       });
 
       if (erroreSignup) {
@@ -135,11 +163,10 @@ export default function DashboardSuperAdmin() {
 
       const { error: erroreProfilo } = await supabase.from('profiles').insert({
         id: datiSignup.user.id,
-        ruolo: ruoloNuovo,
-        nome: nomeNuovo,
-        email: emailNuovo,
+        ruolo: 'admin_azienda',
+        nome: nomeAdmin,
+        email: emailAdmin,
         azienda_id: aziendaEspansa,
-        studio_id: ruoloNuovo === 'utente_studio' ? studioNuovo : null,
         creato_da: profile.id,
       });
 
@@ -148,16 +175,68 @@ export default function DashboardSuperAdmin() {
         return;
       }
 
-      setSuccesso('Utente creato con successo.');
-      setNomeNuovo('');
-      setEmailNuovo('');
-      setPasswordNuovo('');
-      setStudioNuovo('');
-      caricaDatiAzienda(aziendaEspansa);
+      setSuccesso('Amministratore creato con successo.');
+      setNomeAdmin('');
+      setEmailAdmin('');
+      setPasswordAdmin('');
+      caricaAmministratori(aziendaEspansa);
     } catch (err) {
       setErrore('Errore imprevisto: ' + err.message);
     } finally {
-      setCreando(false);
+      setCreandoAdmin(false);
+    }
+  }
+
+  async function creaUtenteStudio(e) {
+    e.preventDefault();
+    setErrore('');
+    setSuccesso('');
+
+    if (!studioNuovo) {
+      setErrore('Seleziona uno studio.');
+      return;
+    }
+
+    setCreandoUtente(true);
+
+    try {
+      const adminCorrente = amministratori.find(a => a.id === adminEspanso);
+      const clientTemporaneo = creaClientPerNuovoUtente();
+      const { data: datiSignup, error: erroreSignup } = await clientTemporaneo.auth.signUp({
+        email: emailUtente,
+        password: passwordUtente,
+      });
+
+      if (erroreSignup) {
+        setErrore('Errore nella creazione dell\'account: ' + erroreSignup.message);
+        return;
+      }
+
+      const { error: erroreProfilo } = await supabase.from('profiles').insert({
+        id: datiSignup.user.id,
+        ruolo: 'utente_studio',
+        nome: nomeUtente,
+        email: emailUtente,
+        azienda_id: adminCorrente.azienda_id,
+        studio_id: studioNuovo,
+        creato_da: adminCorrente.id,
+      });
+
+      if (erroreProfilo) {
+        setErrore('Account creato ma errore nel collegare il profilo: ' + erroreProfilo.message);
+        return;
+      }
+
+      setSuccesso('Utente studio creato con successo.');
+      setNomeUtente('');
+      setEmailUtente('');
+      setPasswordUtente('');
+      setStudioNuovo('');
+      caricaUtentiStudio(adminCorrente.azienda_id);
+    } catch (err) {
+      setErrore('Errore imprevisto: ' + err.message);
+    } finally {
+      setCreandoUtente(false);
     }
   }
 
@@ -166,7 +245,7 @@ export default function DashboardSuperAdmin() {
     setNomeModificato(utente.nome);
   }
 
-  async function salvaModifica(utente) {
+  async function salvaModifica(utente, ricaricaFn) {
     setErrore('');
     setSuccesso('');
     const { error } = await supabase.from('profiles').update({ nome: nomeModificato }).eq('id', utente.id);
@@ -176,7 +255,7 @@ export default function DashboardSuperAdmin() {
     }
     setModificaId(null);
     setSuccesso('Nome aggiornato.');
-    caricaDatiAzienda(aziendaEspansa);
+    ricaricaFn();
   }
 
   async function resettaPassword(utente) {
@@ -196,13 +275,12 @@ export default function DashboardSuperAdmin() {
     setSuccesso(`Email di reset password inviata a ${utente.email}.`);
   }
 
-  async function eliminaUtente(utente) {
+  async function eliminaUtente(utente, ricaricaFn) {
     if (!confirm(`Eliminare definitivamente l'account di "${utente.nome}" (${utente.email || 'nessuna email salvata'})? L'account non esisterà più, l'email tornerà libera. Questa azione non è reversibile.`)) {
       return;
     }
     setErrore('');
     setSuccesso('');
-
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const risposta = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/elimina-utente`, {
@@ -220,7 +298,8 @@ export default function DashboardSuperAdmin() {
         return;
       }
       setSuccesso('Account eliminato definitivamente. L\'email può essere riutilizzata subito.');
-      caricaDatiAzienda(aziendaEspansa);
+      if (utente.id === adminEspanso) setAdminEspanso(null);
+      ricaricaFn();
     } catch (err) {
       setErrore('Errore imprevisto: ' + err.message);
     }
@@ -246,18 +325,21 @@ export default function DashboardSuperAdmin() {
 
         <div className="card">
           <h2 style={{ marginTop: 0, fontSize: 18 }}>Aziende registrate</h2>
-          <p style={{ fontSize: 13, color: '#6b7280', marginTop: -8 }}>Clicca su un'azienda per vedere e gestire i suoi utenti.</p>
+          <p style={{ fontSize: 13, color: '#6b7280', marginTop: -8 }}>
+            Clicca su un'azienda per vedere i suoi amministratori, poi su un amministratore per vedere i suoi utenti studio.
+          </p>
 
           {aziende.length === 0 && <p style={{ color: '#6b7280' }}>Nessuna azienda ancora.</p>}
 
           {aziende.map(a => (
             <div key={a.id} style={{ marginBottom: 10 }}>
+              {/* LIVELLO 1: AZIENDA */}
               <div
                 className="ticket-item"
                 onClick={() => apriAzienda(a)}
                 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 0 }}
               >
-                <strong>{aziendaEspansa === a.id ? '▾ ' : '▸ '}{a.nome}</strong>
+                <strong>{aziendaEspansa === a.id ? '▾ ' : '▸ '}🏢 {a.nome}</strong>
                 <button
                   className="btn btn-danger"
                   onClick={(e) => { e.stopPropagation(); eliminaAzienda(a); }}
@@ -269,71 +351,112 @@ export default function DashboardSuperAdmin() {
 
               {aziendaEspansa === a.id && (
                 <div style={{ border: '1px solid #2563eb', borderTop: 'none', borderRadius: '0 0 8px 8px', padding: 16, background: '#f8faff' }}>
-                  <h3 style={{ fontSize: 15, marginTop: 0 }}>Aggiungi utente a "{a.nome}"</h3>
-                  <form onSubmit={creaUtenteInAzienda}>
-                    <label>Ruolo</label>
-                    <select value={ruoloNuovo} onChange={e => setRuoloNuovo(e.target.value)}>
-                      <option value="admin_azienda">Amministratore azienda</option>
-                      <option value="utente_studio">Utente studio</option>
-                    </select>
-
-                    {ruoloNuovo === 'utente_studio' && (
-                      <>
-                        <label>Studio</label>
-                        <select value={studioNuovo} onChange={e => setStudioNuovo(e.target.value)}>
-                          <option value="">Seleziona studio…</option>
-                          {studiAzienda.map(s => (
-                            <option key={s.id} value={s.id}>{s.nome}</option>
-                          ))}
-                        </select>
-                        {studiAzienda.length === 0 && (
-                          <p style={{ fontSize: 12, color: '#b91c1c', marginTop: -8 }}>
-                            Questa azienda non ha ancora studi creati (li crea l'admin azienda dal suo pannello).
-                          </p>
-                        )}
-                      </>
-                    )}
-
+                  <h3 style={{ fontSize: 15, marginTop: 0 }}>Aggiungi amministratore a "{a.nome}"</h3>
+                  <form onSubmit={creaAdmin}>
                     <label>Nome e cognome</label>
-                    <input value={nomeNuovo} onChange={e => setNomeNuovo(e.target.value)} required />
+                    <input value={nomeAdmin} onChange={e => setNomeAdmin(e.target.value)} required />
                     <label>Email</label>
-                    <input type="email" value={emailNuovo} onChange={e => setEmailNuovo(e.target.value)} required />
+                    <input type="email" value={emailAdmin} onChange={e => setEmailAdmin(e.target.value)} required />
                     <label>Password provvisoria</label>
-                    <input type="text" value={passwordNuovo} onChange={e => setPasswordNuovo(e.target.value)} required />
-                    <button className="btn" type="submit" disabled={creando}>
-                      {creando ? 'Creazione…' : 'Crea utente'}
+                    <input type="text" value={passwordAdmin} onChange={e => setPasswordAdmin(e.target.value)} required />
+                    <button className="btn" type="submit" disabled={creandoAdmin}>
+                      {creandoAdmin ? 'Creazione…' : 'Crea amministratore'}
                     </button>
                   </form>
 
                   <h3 style={{ fontSize: 15, marginTop: 24, borderTop: '1px solid #dbe4f5', paddingTop: 16 }}>
-                    Utenti di questa azienda
+                    Amministratori
                   </h3>
-                  {utentiAzienda.length === 0 && <p style={{ color: '#6b7280' }}>Nessun utente ancora.</p>}
-                  {utentiAzienda.map(u => (
-                    <div key={u.id} className="ticket-item" style={{ cursor: 'default', background: 'white' }}>
-                      {modificaId === u.id ? (
-                        <div>
-                          <input value={nomeModificato} onChange={e => setNomeModificato(e.target.value)} style={{ marginBottom: 8 }} />
-                          <div style={{ display: 'flex', gap: 8 }}>
-                            <button className="btn" onClick={() => salvaModifica(u)} style={{ padding: '6px 12px', fontSize: 13 }}>Salva</button>
-                            <button className="btn btn-secondary" onClick={() => setModificaId(null)} style={{ padding: '6px 12px', fontSize: 13 }}>Annulla</button>
+                  {amministratori.length === 0 && <p style={{ color: '#6b7280' }}>Nessun amministratore ancora.</p>}
+
+                  {amministratori.map(admin => (
+                    <div key={admin.id} style={{ marginBottom: 8 }}>
+                      {/* LIVELLO 2: AMMINISTRATORE */}
+                      <div
+                        className="ticket-item"
+                        onClick={() => apriAdmin(admin)}
+                        style={{ background: 'white', cursor: 'pointer', marginBottom: 0 }}
+                      >
+                        {modificaId === admin.id ? (
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <input value={nomeModificato} onChange={e => setNomeModificato(e.target.value)} style={{ marginBottom: 8 }} />
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              <button className="btn" onClick={() => salvaModifica(admin, () => caricaAmministratori(aziendaEspansa))} style={{ padding: '6px 12px', fontSize: 13 }}>Salva</button>
+                              <button className="btn btn-secondary" onClick={() => setModificaId(null)} style={{ padding: '6px 12px', fontSize: 13 }}>Annulla</button>
+                            </div>
                           </div>
-                        </div>
-                      ) : (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
-                          <div>
-                            <strong>{u.nome}</strong>
-                            <span className="badge badge-tipo" style={{ marginLeft: 8 }}>
-                              {u.ruolo === 'admin_azienda' ? 'Admin azienda' : 'Utente studio'}
-                            </span>
-                            {u.email && <div style={{ fontSize: 13, color: '#6b7280' }}>{u.email}</div>}
-                            {u.studi?.nome && <div style={{ fontSize: 13, color: '#6b7280' }}>Sede: {u.studi.nome}</div>}
+                        ) : (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
+                            <div>
+                              <strong>{adminEspanso === admin.id ? '▾ ' : '▸ '}👤 {admin.nome}</strong>
+                              {admin.email && <div style={{ fontSize: 13, color: '#6b7280' }}>{admin.email}</div>}
+                            </div>
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} onClick={(e) => e.stopPropagation()}>
+                              <button className="btn btn-secondary" onClick={() => iniziaModifica(admin)} style={{ padding: '6px 12px', fontSize: 13 }}>Modifica nome</button>
+                              <button className="btn btn-secondary" onClick={() => resettaPassword(admin)} style={{ padding: '6px 12px', fontSize: 13 }}>Reset password</button>
+                              <button className="btn btn-danger" onClick={() => eliminaUtente(admin, () => caricaAmministratori(aziendaEspansa))} style={{ padding: '6px 12px', fontSize: 13 }}>Elimina</button>
+                            </div>
                           </div>
-                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                            <button className="btn btn-secondary" onClick={() => iniziaModifica(u)} style={{ padding: '6px 12px', fontSize: 13 }}>Modifica nome</button>
-                            <button className="btn btn-secondary" onClick={() => resettaPassword(u)} style={{ padding: '6px 12px', fontSize: 13 }}>Reset password</button>
-                            <button className="btn btn-danger" onClick={() => eliminaUtente(u)} style={{ padding: '6px 12px', fontSize: 13 }}>Elimina</button>
-                          </div>
+                        )}
+                      </div>
+
+                      {adminEspanso === admin.id && (
+                        <div style={{ border: '1px solid #93c5fd', borderTop: 'none', borderRadius: '0 0 8px 8px', padding: 14, background: '#eff6ff' }}>
+                          <h4 style={{ fontSize: 14, marginTop: 0 }}>Aggiungi utente studio (creato da {admin.nome})</h4>
+                          <form onSubmit={creaUtenteStudio}>
+                            <label>Studio</label>
+                            <select value={studioNuovo} onChange={e => setStudioNuovo(e.target.value)} required>
+                              <option value="">Seleziona studio…</option>
+                              {studiAzienda.map(s => (
+                                <option key={s.id} value={s.id}>{s.nome}</option>
+                              ))}
+                            </select>
+                            {studiAzienda.length === 0 && (
+                              <p style={{ fontSize: 12, color: '#b91c1c', marginTop: -8 }}>
+                                Nessuno studio ancora per questa azienda (li crea l'admin azienda dal suo pannello "Set up").
+                              </p>
+                            )}
+                            <label>Nome e cognome</label>
+                            <input value={nomeUtente} onChange={e => setNomeUtente(e.target.value)} required />
+                            <label>Email</label>
+                            <input type="email" value={emailUtente} onChange={e => setEmailUtente(e.target.value)} required />
+                            <label>Password provvisoria</label>
+                            <input type="text" value={passwordUtente} onChange={e => setPasswordUtente(e.target.value)} required />
+                            <button className="btn" type="submit" disabled={creandoUtente}>
+                              {creandoUtente ? 'Creazione…' : 'Crea utente studio'}
+                            </button>
+                          </form>
+
+                          <h4 style={{ fontSize: 14, marginTop: 20, borderTop: '1px solid #bfdbfe', paddingTop: 14 }}>
+                            Utenti studio di questa azienda
+                          </h4>
+                          {utentiStudio.length === 0 && <p style={{ color: '#6b7280', fontSize: 13 }}>Nessun utente studio ancora.</p>}
+                          {utentiStudio.map(u => (
+                            <div key={u.id} className="ticket-item" style={{ cursor: 'default', background: 'white' }}>
+                              {modificaId === u.id ? (
+                                <div>
+                                  <input value={nomeModificato} onChange={e => setNomeModificato(e.target.value)} style={{ marginBottom: 8 }} />
+                                  <div style={{ display: 'flex', gap: 8 }}>
+                                    <button className="btn" onClick={() => salvaModifica(u, () => caricaUtentiStudio(admin.azienda_id))} style={{ padding: '6px 12px', fontSize: 13 }}>Salva</button>
+                                    <button className="btn btn-secondary" onClick={() => setModificaId(null)} style={{ padding: '6px 12px', fontSize: 13 }}>Annulla</button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
+                                  <div>
+                                    <strong>{u.nome}</strong>
+                                    {u.email && <div style={{ fontSize: 13, color: '#6b7280' }}>{u.email}</div>}
+                                    {u.studi?.nome && <div style={{ fontSize: 13, color: '#6b7280' }}>Sede: {u.studi.nome}</div>}
+                                  </div>
+                                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                    <button className="btn btn-secondary" onClick={() => iniziaModifica(u)} style={{ padding: '6px 12px', fontSize: 13 }}>Modifica nome</button>
+                                    <button className="btn btn-secondary" onClick={() => resettaPassword(u)} style={{ padding: '6px 12px', fontSize: 13 }}>Reset password</button>
+                                    <button className="btn btn-danger" onClick={() => eliminaUtente(u, () => caricaUtentiStudio(admin.azienda_id))} style={{ padding: '6px 12px', fontSize: 13 }}>Elimina</button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>
