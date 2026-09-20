@@ -57,16 +57,34 @@ export default function DettaglioTicket() {
     const nomeFile = allegato.storage_path.split('/').pop();
     const { data, error } = await supabase.storage
       .from('allegati-ticket')
-      .createSignedUrl(allegato.storage_path, 60, { download: nomeFile });
+      .createSignedUrl(allegato.storage_path, 60);
 
     if (error) {
       setErrore('Errore nel recupero della foto: ' + error.message);
       return;
     }
 
-    // Con "download" impostato, il browser salva sempre il file
-    // invece di provare ad aprirlo/visualizzarlo nella scheda.
-    window.open(data.signedUrl, '_blank');
+    try {
+      // Scarica davvero i byte del file PRIMA di cancellarlo dallo storage,
+      // per essere certi che il download sia completato con successo.
+      const rispostaFile = await fetch(data.signedUrl);
+      if (!rispostaFile.ok) {
+        setErrore('Errore nel download della foto: il file potrebbe non essere più disponibile.');
+        return;
+      }
+      const blob = await rispostaFile.blob();
+      const urlBlob = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = urlBlob;
+      link.download = nomeFile;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(urlBlob);
+    } catch (err) {
+      setErrore('Errore nel download della foto: ' + err.message);
+      return;
+    }
 
     // Segna come scaricata
     await supabase
