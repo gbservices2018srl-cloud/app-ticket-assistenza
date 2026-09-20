@@ -7,25 +7,28 @@ import Navbar from '../../components/Navbar';
 export default function DashboardSuperAdmin() {
   const { profile, loading, logout } = useProfile();
   const [aziende, setAziende] = useState([]);
-  const [utenti, setUtenti] = useState([]);
   const [nomeAzienda, setNomeAzienda] = useState('');
   const [errore, setErrore] = useState('');
   const [successo, setSuccesso] = useState('');
 
-  const [aziendaSelezionata, setAziendaSelezionata] = useState('');
-  const [nomeAdmin, setNomeAdmin] = useState('');
-  const [emailAdmin, setEmailAdmin] = useState('');
-  const [passwordAdmin, setPasswordAdmin] = useState('');
-  const [creandoAdmin, setCreandoAdmin] = useState(false);
+  // Azienda aperta (drill-down) e i suoi dati
+  const [aziendaEspansa, setAziendaEspansa] = useState(null);
+  const [utentiAzienda, setUtentiAzienda] = useState([]);
+  const [studiAzienda, setStudiAzienda] = useState([]);
+
+  // Form "aggiungi utente" dentro l'azienda espansa
+  const [ruoloNuovo, setRuoloNuovo] = useState('utente_studio');
+  const [studioNuovo, setStudioNuovo] = useState('');
+  const [nomeNuovo, setNomeNuovo] = useState('');
+  const [emailNuovo, setEmailNuovo] = useState('');
+  const [passwordNuovo, setPasswordNuovo] = useState('');
+  const [creando, setCreando] = useState(false);
 
   const [modificaId, setModificaId] = useState(null);
   const [nomeModificato, setNomeModificato] = useState('');
 
   useEffect(() => {
-    if (profile) {
-      caricaAziende();
-      caricaUtenti();
-    }
+    if (profile) caricaAziende();
   }, [profile]);
 
   async function caricaAziende() {
@@ -33,13 +36,32 @@ export default function DashboardSuperAdmin() {
     setAziende(data || []);
   }
 
-  async function caricaUtenti() {
-    const { data } = await supabase
+  async function apriAzienda(azienda) {
+    if (aziendaEspansa === azienda.id) {
+      setAziendaEspansa(null);
+      return;
+    }
+    setAziendaEspansa(azienda.id);
+    setErrore('');
+    setSuccesso('');
+    await caricaDatiAzienda(azienda.id);
+  }
+
+  async function caricaDatiAzienda(aziendaId) {
+    const { data: utenti } = await supabase
       .from('profiles')
-      .select('*, aziende(nome), studi(nome)')
-      .in('ruolo', ['admin_azienda', 'utente_studio'])
+      .select('*, studi(nome)')
+      .eq('azienda_id', aziendaId)
+      .order('ruolo', { ascending: true })
       .order('creato_il', { ascending: false });
-    setUtenti(data || []);
+    setUtentiAzienda(utenti || []);
+
+    const { data: studi } = await supabase
+      .from('studi')
+      .select('*')
+      .eq('azienda_id', aziendaId)
+      .order('nome', { ascending: true });
+    setStudiAzienda(studi || []);
   }
 
   async function creaAzienda(e) {
@@ -80,24 +102,30 @@ export default function DashboardSuperAdmin() {
         return;
       }
       setSuccesso('Azienda e tutti i suoi account eliminati.');
+      if (aziendaEspansa === azienda.id) setAziendaEspansa(null);
       caricaAziende();
-      caricaUtenti();
     } catch (err) {
       setErrore('Errore imprevisto: ' + err.message);
     }
   }
 
-  async function creaAdmin(e) {
+  async function creaUtenteInAzienda(e) {
     e.preventDefault();
     setErrore('');
     setSuccesso('');
-    setCreandoAdmin(true);
+
+    if (ruoloNuovo === 'utente_studio' && !studioNuovo) {
+      setErrore('Seleziona uno studio per l\'utente studio.');
+      return;
+    }
+
+    setCreando(true);
 
     try {
       const clientTemporaneo = creaClientPerNuovoUtente();
       const { data: datiSignup, error: erroreSignup } = await clientTemporaneo.auth.signUp({
-        email: emailAdmin,
-        password: passwordAdmin,
+        email: emailNuovo,
+        password: passwordNuovo,
       });
 
       if (erroreSignup) {
@@ -107,10 +135,11 @@ export default function DashboardSuperAdmin() {
 
       const { error: erroreProfilo } = await supabase.from('profiles').insert({
         id: datiSignup.user.id,
-        ruolo: 'admin_azienda',
-        nome: nomeAdmin,
-        email: emailAdmin,
-        azienda_id: aziendaSelezionata,
+        ruolo: ruoloNuovo,
+        nome: nomeNuovo,
+        email: emailNuovo,
+        azienda_id: aziendaEspansa,
+        studio_id: ruoloNuovo === 'utente_studio' ? studioNuovo : null,
         creato_da: profile.id,
       });
 
@@ -119,15 +148,16 @@ export default function DashboardSuperAdmin() {
         return;
       }
 
-      setSuccesso('Amministratore azienda creato con successo.');
-      setNomeAdmin('');
-      setEmailAdmin('');
-      setPasswordAdmin('');
-      caricaUtenti();
+      setSuccesso('Utente creato con successo.');
+      setNomeNuovo('');
+      setEmailNuovo('');
+      setPasswordNuovo('');
+      setStudioNuovo('');
+      caricaDatiAzienda(aziendaEspansa);
     } catch (err) {
       setErrore('Errore imprevisto: ' + err.message);
     } finally {
-      setCreandoAdmin(false);
+      setCreando(false);
     }
   }
 
@@ -146,7 +176,7 @@ export default function DashboardSuperAdmin() {
     }
     setModificaId(null);
     setSuccesso('Nome aggiornato.');
-    caricaUtenti();
+    caricaDatiAzienda(aziendaEspansa);
   }
 
   async function resettaPassword(utente) {
@@ -190,16 +220,13 @@ export default function DashboardSuperAdmin() {
         return;
       }
       setSuccesso('Account eliminato definitivamente. L\'email può essere riutilizzata subito.');
-      caricaUtenti();
+      caricaDatiAzienda(aziendaEspansa);
     } catch (err) {
       setErrore('Errore imprevisto: ' + err.message);
     }
   }
 
   if (loading || !profile) return <div className="container">Caricamento…</div>;
-
-  const amministratori = utenti.filter(u => u.ruolo === 'admin_azienda');
-  const utentiStudio = utenti.filter(u => u.ruolo === 'utente_studio');
 
   return (
     <div>
@@ -218,116 +245,105 @@ export default function DashboardSuperAdmin() {
         </div>
 
         <div className="card">
-          <h2 style={{ marginTop: 0, fontSize: 18 }}>Crea amministratore azienda</h2>
-          <form onSubmit={creaAdmin}>
-            <label>Azienda</label>
-            <select value={aziendaSelezionata} onChange={e => setAziendaSelezionata(e.target.value)} required>
-              <option value="">Seleziona azienda…</option>
-              {aziende.map(a => (
-                <option key={a.id} value={a.id}>{a.nome}</option>
-              ))}
-            </select>
-            <label>Nome e cognome</label>
-            <input value={nomeAdmin} onChange={e => setNomeAdmin(e.target.value)} required />
-            <label>Email</label>
-            <input type="email" value={emailAdmin} onChange={e => setEmailAdmin(e.target.value)} required />
-            <label>Password provvisoria</label>
-            <input type="text" value={passwordAdmin} onChange={e => setPasswordAdmin(e.target.value)} required />
-            <button className="btn" type="submit" disabled={creandoAdmin}>
-              {creandoAdmin ? 'Creazione…' : 'Crea admin azienda'}
-            </button>
-          </form>
-        </div>
-
-        <div className="card">
           <h2 style={{ marginTop: 0, fontSize: 18 }}>Aziende registrate</h2>
+          <p style={{ fontSize: 13, color: '#6b7280', marginTop: -8 }}>Clicca su un'azienda per vedere e gestire i suoi utenti.</p>
+
           {aziende.length === 0 && <p style={{ color: '#6b7280' }}>Nessuna azienda ancora.</p>}
+
           {aziende.map(a => (
-            <div key={a.id} className="ticket-item" style={{ cursor: 'default' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <strong>{a.nome}</strong>
-                <button className="btn btn-danger" onClick={() => eliminaAzienda(a)} style={{ padding: '6px 12px', fontSize: 13 }}>
-                  Elimina
+            <div key={a.id} style={{ marginBottom: 10 }}>
+              <div
+                className="ticket-item"
+                onClick={() => apriAzienda(a)}
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 0 }}
+              >
+                <strong>{aziendaEspansa === a.id ? '▾ ' : '▸ '}{a.nome}</strong>
+                <button
+                  className="btn btn-danger"
+                  onClick={(e) => { e.stopPropagation(); eliminaAzienda(a); }}
+                  style={{ padding: '6px 12px', fontSize: 13 }}
+                >
+                  Elimina azienda
                 </button>
               </div>
+
+              {aziendaEspansa === a.id && (
+                <div style={{ border: '1px solid #2563eb', borderTop: 'none', borderRadius: '0 0 8px 8px', padding: 16, background: '#f8faff' }}>
+                  <h3 style={{ fontSize: 15, marginTop: 0 }}>Aggiungi utente a "{a.nome}"</h3>
+                  <form onSubmit={creaUtenteInAzienda}>
+                    <label>Ruolo</label>
+                    <select value={ruoloNuovo} onChange={e => setRuoloNuovo(e.target.value)}>
+                      <option value="admin_azienda">Amministratore azienda</option>
+                      <option value="utente_studio">Utente studio</option>
+                    </select>
+
+                    {ruoloNuovo === 'utente_studio' && (
+                      <>
+                        <label>Studio</label>
+                        <select value={studioNuovo} onChange={e => setStudioNuovo(e.target.value)}>
+                          <option value="">Seleziona studio…</option>
+                          {studiAzienda.map(s => (
+                            <option key={s.id} value={s.id}>{s.nome}</option>
+                          ))}
+                        </select>
+                        {studiAzienda.length === 0 && (
+                          <p style={{ fontSize: 12, color: '#b91c1c', marginTop: -8 }}>
+                            Questa azienda non ha ancora studi creati (li crea l'admin azienda dal suo pannello).
+                          </p>
+                        )}
+                      </>
+                    )}
+
+                    <label>Nome e cognome</label>
+                    <input value={nomeNuovo} onChange={e => setNomeNuovo(e.target.value)} required />
+                    <label>Email</label>
+                    <input type="email" value={emailNuovo} onChange={e => setEmailNuovo(e.target.value)} required />
+                    <label>Password provvisoria</label>
+                    <input type="text" value={passwordNuovo} onChange={e => setPasswordNuovo(e.target.value)} required />
+                    <button className="btn" type="submit" disabled={creando}>
+                      {creando ? 'Creazione…' : 'Crea utente'}
+                    </button>
+                  </form>
+
+                  <h3 style={{ fontSize: 15, marginTop: 24, borderTop: '1px solid #dbe4f5', paddingTop: 16 }}>
+                    Utenti di questa azienda
+                  </h3>
+                  {utentiAzienda.length === 0 && <p style={{ color: '#6b7280' }}>Nessun utente ancora.</p>}
+                  {utentiAzienda.map(u => (
+                    <div key={u.id} className="ticket-item" style={{ cursor: 'default', background: 'white' }}>
+                      {modificaId === u.id ? (
+                        <div>
+                          <input value={nomeModificato} onChange={e => setNomeModificato(e.target.value)} style={{ marginBottom: 8 }} />
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button className="btn" onClick={() => salvaModifica(u)} style={{ padding: '6px 12px', fontSize: 13 }}>Salva</button>
+                            <button className="btn btn-secondary" onClick={() => setModificaId(null)} style={{ padding: '6px 12px', fontSize: 13 }}>Annulla</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
+                          <div>
+                            <strong>{u.nome}</strong>
+                            <span className="badge badge-tipo" style={{ marginLeft: 8 }}>
+                              {u.ruolo === 'admin_azienda' ? 'Admin azienda' : 'Utente studio'}
+                            </span>
+                            {u.email && <div style={{ fontSize: 13, color: '#6b7280' }}>{u.email}</div>}
+                            {u.studi?.nome && <div style={{ fontSize: 13, color: '#6b7280' }}>Sede: {u.studi.nome}</div>}
+                          </div>
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            <button className="btn btn-secondary" onClick={() => iniziaModifica(u)} style={{ padding: '6px 12px', fontSize: 13 }}>Modifica nome</button>
+                            <button className="btn btn-secondary" onClick={() => resettaPassword(u)} style={{ padding: '6px 12px', fontSize: 13 }}>Reset password</button>
+                            <button className="btn btn-danger" onClick={() => eliminaUtente(u)} style={{ padding: '6px 12px', fontSize: 13 }}>Elimina</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          ))}
-        </div>
-
-        <div className="card">
-          <h2 style={{ marginTop: 0, fontSize: 18 }}>Amministratori azienda</h2>
-          {amministratori.length === 0 && <p style={{ color: '#6b7280' }}>Nessun amministratore ancora.</p>}
-          {amministratori.map(u => (
-            <RigaUtente
-              key={u.id}
-              utente={u}
-              sottotitolo={u.aziende?.nome ? `Azienda: ${u.aziende.nome}` : ''}
-              inModifica={modificaId === u.id}
-              nomeModificato={nomeModificato}
-              onCambiaNome={setNomeModificato}
-              onIniziaModifica={() => iniziaModifica(u)}
-              onSalvaModifica={() => salvaModifica(u)}
-              onAnnullaModifica={() => setModificaId(null)}
-              onResetPassword={() => resettaPassword(u)}
-              onElimina={() => eliminaUtente(u)}
-            />
-          ))}
-        </div>
-
-        <div className="card">
-          <h2 style={{ marginTop: 0, fontSize: 18 }}>Utenti studio (tutte le aziende)</h2>
-          {utentiStudio.length === 0 && <p style={{ color: '#6b7280' }}>Nessun utente studio ancora.</p>}
-          {utentiStudio.map(u => (
-            <RigaUtente
-              key={u.id}
-              utente={u}
-              sottotitolo={[u.aziende?.nome, u.studi?.nome].filter(Boolean).join(' — ')}
-              inModifica={modificaId === u.id}
-              nomeModificato={nomeModificato}
-              onCambiaNome={setNomeModificato}
-              onIniziaModifica={() => iniziaModifica(u)}
-              onSalvaModifica={() => salvaModifica(u)}
-              onAnnullaModifica={() => setModificaId(null)}
-              onResetPassword={() => resettaPassword(u)}
-              onElimina={() => eliminaUtente(u)}
-            />
           ))}
         </div>
       </div>
-    </div>
-  );
-}
-
-function RigaUtente({
-  utente, sottotitolo, inModifica, nomeModificato, onCambiaNome,
-  onIniziaModifica, onSalvaModifica, onAnnullaModifica, onResetPassword, onElimina,
-}) {
-  return (
-    <div className="ticket-item" style={{ cursor: 'default' }}>
-      {inModifica ? (
-        <div>
-          <input value={nomeModificato} onChange={e => onCambiaNome(e.target.value)} style={{ marginBottom: 8 }} />
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn" onClick={onSalvaModifica} style={{ padding: '6px 12px', fontSize: 13 }}>Salva</button>
-            <button className="btn btn-secondary" onClick={onAnnullaModifica} style={{ padding: '6px 12px', fontSize: 13 }}>Annulla</button>
-          </div>
-        </div>
-      ) : (
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
-            <div>
-              <strong>{utente.nome}</strong>
-              {utente.email && <div style={{ fontSize: 13, color: '#6b7280' }}>{utente.email}</div>}
-              {sottotitolo && <div style={{ fontSize: 13, color: '#6b7280' }}>{sottotitolo}</div>}
-            </div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              <button className="btn btn-secondary" onClick={onIniziaModifica} style={{ padding: '6px 12px', fontSize: 13 }}>Modifica nome</button>
-              <button className="btn btn-secondary" onClick={onResetPassword} style={{ padding: '6px 12px', fontSize: 13 }}>Reset password</button>
-              <button className="btn btn-danger" onClick={onElimina} style={{ padding: '6px 12px', fontSize: 13 }}>Elimina</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
