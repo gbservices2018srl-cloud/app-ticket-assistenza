@@ -209,18 +209,33 @@ export default function DashboardAdminAzienda() {
   }
 
   async function eliminaUtente(utente) {
-    if (!confirm(`Eliminare l'accesso di "${utente.nome}"? Non potrà più accedere all'app. Questa azione non è reversibile.`)) {
+    if (!confirm(`Eliminare definitivamente l'account di "${utente.nome}"? L'account non esisterà più, l'email tornerà libera. Questa azione non è reversibile.`)) {
       return;
     }
     setErrore('');
     setSuccesso('');
-    const { error } = await supabase.from('profiles').delete().eq('id', utente.id);
-    if (error) {
-      setErrore(error.message);
-      return;
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const risposta = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/elimina-utente`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ azione: 'utente', id: utente.id }),
+      });
+      const risultato = await risposta.json();
+      if (!risposta.ok) {
+        setErrore('Errore durante l\'eliminazione: ' + (risultato.errore || 'errore sconosciuto'));
+        return;
+      }
+      setSuccesso('Account eliminato definitivamente. L\'email può essere riutilizzata subito.');
+      caricaUtentiStudio();
+    } catch (err) {
+      setErrore('Errore imprevisto: ' + err.message);
     }
-    setSuccesso('Utente eliminato.');
-    caricaUtentiStudio();
   }
 
   if (loading || !profile) return <div className="container">Caricamento…</div>;

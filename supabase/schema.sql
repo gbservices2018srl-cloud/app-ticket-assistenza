@@ -36,7 +36,7 @@ create table if not exists public.profiles (
   email text,
   azienda_id uuid references public.aziende(id) on delete set null,
   studio_id uuid references public.studi(id) on delete set null,
-  creato_da uuid references public.profiles(id),
+  creato_da uuid references public.profiles(id) on delete set null,
   creato_il timestamptz not null default now()
 );
 
@@ -47,12 +47,12 @@ create table if not exists public.tickets (
   id uuid primary key default uuid_generate_v4(),
   studio_id uuid not null references public.studi(id) on delete cascade,
   azienda_id uuid not null references public.aziende(id) on delete cascade,
-  creato_da uuid not null references public.profiles(id),
+  creato_da uuid references public.profiles(id) on delete set null,
   tipo text not null check (tipo in ('problema_generico', 'guasto_attrezzatura')),
   titolo text not null,
   descrizione text not null,
   stato text not null default 'aperto' check (stato in ('aperto', 'in_lavorazione', 'risolto')),
-  assegnato_a uuid references public.profiles(id),
+  assegnato_a uuid references public.profiles(id) on delete set null,
   creato_il timestamptz not null default now(),
   aggiornato_il timestamptz not null default now(),
   presa_in_carico_il timestamptz,
@@ -69,7 +69,7 @@ create table if not exists public.ticket_allegati (
   caricato_il timestamptz not null default now(),
   scaricato boolean not null default false,
   scaricato_il timestamptz,
-  scaricato_da uuid references public.profiles(id),
+  scaricato_da uuid references public.profiles(id) on delete set null,
   eliminato boolean not null default false
 );
 
@@ -80,7 +80,7 @@ create table if not exists public.ticket_soluzioni (
   id uuid primary key default uuid_generate_v4(),
   ticket_id uuid not null references public.tickets(id) on delete cascade,
   testo_soluzione text not null,
-  risolto_da uuid not null references public.profiles(id),
+  risolto_da uuid references public.profiles(id) on delete set null,
   risolto_il timestamptz not null default now()
 );
 
