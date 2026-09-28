@@ -330,3 +330,52 @@ using (
 -- REALTIME (necessario per le notifiche di nuovo ticket)
 -- ------------------------------------------------------------
 alter publication supabase_realtime add table public.tickets;
+
+-- ------------------------------------------------------------
+-- COSTI SOSTENUTI PER TICKET (visibili solo ad amministrazione)
+-- ------------------------------------------------------------
+create table if not exists public.ticket_costi (
+  id uuid primary key default uuid_generate_v4(),
+  ticket_id uuid references public.tickets(id) on delete set null,
+  azienda_id uuid not null references public.aziende(id) on delete cascade,
+  studio_id uuid references public.studi(id) on delete set null,
+  nome_studio text,
+  titolo_ticket text,
+  importo numeric(10,2) not null check (importo >= 0),
+  descrizione text,
+  data_costo date not null default current_date,
+  inserito_da uuid references public.profiles(id) on delete set null,
+  creato_il timestamptz not null default now()
+);
+
+create index if not exists idx_ticket_costi_azienda_data
+  on public.ticket_costi (azienda_id, data_costo);
+create index if not exists idx_ticket_costi_ticket
+  on public.ticket_costi (ticket_id);
+
+alter table public.ticket_costi enable row level security;
+
+create policy "costi_select" on public.ticket_costi for select
+using (
+  public.mio_ruolo() = 'super_admin'
+  or (public.mio_ruolo() = 'admin_azienda' and azienda_id = public.mia_azienda())
+  or (public.mio_ruolo() = 'utente_studio' and studio_id = public.mio_studio())
+);
+
+create policy "costi_insert" on public.ticket_costi for insert
+with check (
+  public.mio_ruolo() = 'super_admin'
+  or (public.mio_ruolo() = 'admin_azienda' and azienda_id = public.mia_azienda())
+);
+
+create policy "costi_update" on public.ticket_costi for update
+using (
+  public.mio_ruolo() = 'super_admin'
+  or (public.mio_ruolo() = 'admin_azienda' and azienda_id = public.mia_azienda())
+);
+
+create policy "costi_delete" on public.ticket_costi for delete
+using (
+  public.mio_ruolo() = 'super_admin'
+  or (public.mio_ruolo() = 'admin_azienda' and azienda_id = public.mia_azienda())
+);

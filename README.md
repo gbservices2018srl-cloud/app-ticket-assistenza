@@ -90,6 +90,13 @@ L'admin azienda vede un bottone "Attiva notifiche": una volta concesso il permes
 - **Admin Azienda**: dentro il pannello "Set up" può modificare il nome e resettare la password degli utenti studio che ha creato, oltre a eliminarne l'accesso.
 - Il **reset password** invia un'email con un link (pagina `/reset-password` inclusa nel progetto) che permette all'utente di impostare una nuova password da solo. Funziona solo per utenti creati **dopo** questo aggiornamento (serve l'email salvata nel profilo) — chi era stato creato prima non ha l'email salvata e va ricreato, oppure gli va assegnata manualmente da SQL Editor: `update public.profiles set email = 'indirizzo@esempio.it' where id = 'UUID-UTENTE';`
 
+## Costi sostenuti per ticket
+
+- Dal dettaglio di un ticket, super admin e admin azienda possono registrare una o più voci di costo (importo, data, descrizione facoltativa) — solo l'amministrazione può aggiungere/eliminare.
+- Lo **studio può vedere** i costi registrati sui propri ticket (sola lettura, senza poterli aggiungere, modificare o eliminare).
+- La pagina "💶 Costi" (pulsante in alto nella dashboard admin azienda e super admin) mostra il totale speso in un periodo a scelta, con il dettaglio per sede — il super admin sceglie prima l'azienda, l'admin azienda vede solo la propria.
+- Se un ticket o una sede vengono eliminati, le voci di costo restano (storico spese mantenuto), con nome sede e titolo ticket salvati come testo fisso al momento della registrazione.
+
 ---
 
 ## Note sulla foto degli allegati

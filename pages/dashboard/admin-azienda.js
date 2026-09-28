@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { useRouter } from 'next/router';
 import { supabase } from '../../lib/supabaseClient';
 import { creaClientPerNuovoUtente } from '../../lib/supabaseAdminClient';
 import { useProfile } from '../../lib/useProfile';
@@ -16,6 +17,7 @@ const TAB_STATO = [
 
 export default function DashboardAdminAzienda() {
   const { profile, loading, logout } = useProfile();
+  const router = useRouter();
   const [studi, setStudi] = useState([]);
   const [utentiStudio, setUtentiStudio] = useState([]);
   const [tickets, setTickets] = useState([]);
@@ -247,9 +249,14 @@ export default function DashboardAdminAzienda() {
         nome={profile.nome}
         onLogout={logout}
         azioneExtra={
-          <button className="btn btn-secondary" onClick={() => setMostraSetup(!mostraSetup)}>
-            ⚙️ Set up
-          </button>
+          <>
+            <button className="btn btn-secondary" onClick={() => router.push('/dashboard/costi')}>
+              💶 Costi
+            </button>
+            <button className="btn btn-secondary" onClick={() => setMostraSetup(!mostraSetup)}>
+              ⚙️ Set up
+            </button>
+          </>
         }
       />
       <div className="container">

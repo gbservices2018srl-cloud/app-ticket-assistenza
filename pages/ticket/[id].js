@@ -28,6 +28,12 @@ export default function DettaglioTicket() {
   const [successo, setSuccesso] = useState('');
   const [aggiornando, setAggiornando] = useState(false);
 
+  const [costi, setCosti] = useState([]);
+  const [importoCosto, setImportoCosto] = useState('');
+  const [descrizioneCosto, setDescrizioneCosto] = useState('');
+  const [dataCosto, setDataCosto] = useState(() => new Date().toISOString().slice(0, 10));
+  const [salvandoCosto, setSalvandoCosto] = useState(false);
+
   const isAmministrazione = profile && (profile.ruolo === 'admin_azienda' || profile.ruolo === 'super_admin');
 
   useEffect(() => {
@@ -51,6 +57,66 @@ export default function DettaglioTicket() {
       .eq('ticket_id', id)
       .order('risolto_il', { ascending: false });
     setSoluzioni(s || []);
+
+    // Il caricamento è tentato per tutti; le regole di sicurezza (RLS) su
+    // Supabase decidono cosa arriva davvero: l'amministrazione vede tutto,
+    // lo studio vede solo i costi dei propri ticket (sola lettura).
+    const { data: c } = await supabase
+      .from('ticket_costi')
+      .select('*')
+      .eq('ticket_id', id)
+      .order('data_costo', { ascending: false });
+    setCosti(c || []);
+  }
+
+  async function aggiungiCosto(e) {
+    e.preventDefault();
+    setErrore('');
+    setSuccesso('');
+
+    const valore = parseFloat(importoCosto.replace(',', '.'));
+    if (isNaN(valore) || valore < 0) {
+      setErrore('Inserisci un importo valido.');
+      return;
+    }
+
+    setSalvandoCosto(true);
+
+    const { error } = await supabase.from('ticket_costi').insert({
+      ticket_id: ticket.id,
+      azienda_id: ticket.azienda_id,
+      studio_id: ticket.studio_id,
+      nome_studio: ticket.studi?.nome || null,
+      titolo_ticket: ticket.titolo,
+      importo: valore,
+      descrizione: descrizioneCosto || null,
+      data_costo: dataCosto,
+      inserito_da: profile.id,
+    });
+
+    setSalvandoCosto(false);
+
+    if (error) {
+      setErrore('Errore nel salvataggio del costo: ' + error.message);
+      return;
+    }
+
+    setImportoCosto('');
+    setDescrizioneCosto('');
+    setDataCosto(new Date().toISOString().slice(0, 10));
+    setSuccesso('Costo registrato.');
+    caricaTutto();
+  }
+
+  async function eliminaCosto(costo) {
+    if (!confirm('Eliminare questa voce di costo?')) return;
+    setErrore('');
+    const { error } = await supabase.from('ticket_costi').delete().eq('id', costo.id);
+    if (error) {
+      setErrore('Errore durante l\'eliminazione: ' + error.message);
+      return;
+    }
+    caricaTutto();
   }
 
   async function scaricaFoto(allegato) {
@@ -212,6 +278,61 @@ export default function DettaglioTicket() {
                 <p style={{ fontSize: 12, color: '#9ca3af', margin: 0 }}>Risolto il {formattaData(s.risolto_il)}</p>
               </div>
             ))}
+          </div>
+        )}
+
+        {costi.length > 0 && (
+          <div className="card">
+            <h3 style={{ marginTop: 0, fontSize: 16 }}>Costo sostenuto</h3>
+
+            <div style={{ marginBottom: isAmministrazione ? 16 : 0 }}>
+              {costi.map(c => (
+                <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #e5e7eb', padding: '8px 0' }}>
+                  <div>
+                    <strong>€ {Number(c.importo).toFixed(2)}</strong>
+                    {c.descrizione && <div style={{ fontSize: 13, color: '#6b7280' }}>{c.descrizione}</div>}
+                    <div style={{ fontSize: 12, color: '#9ca3af' }}>{new Date(c.data_costo).toLocaleDateString('it-IT')}</div>
+                  </div>
+                  {isAmministrazione && (
+                    <button className="btn btn-danger" onClick={() => eliminaCosto(c)} style={{ padding: '4px 10px', fontSize: 12 }}>
+                      Elimina
+                    </button>
+                  )}
+                </div>
+              ))}
+              <div style={{ textAlign: 'right', marginTop: 8, fontWeight: 700 }}>
+                Totale: € {costi.reduce((tot, c) => tot + Number(c.importo), 0).toFixed(2)}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isAmministrazione && (
+          <div className="card">
+            <h3 style={{ marginTop: 0, fontSize: 16 }}>Aggiungi costo</h3>
+            <form onSubmit={aggiungiCosto}>
+              <label>Importo (€)</label>
+              <input
+                type="text"
+                inputMode="decimal"
+                placeholder="Es. 45,00"
+                value={importoCosto}
+                onChange={e => setImportoCosto(e.target.value)}
+                required
+              />
+              <label>Data</label>
+              <input type="date" value={dataCosto} onChange={e => setDataCosto(e.target.value)} required />
+              <label>Descrizione (facoltativa)</label>
+              <input
+                type="text"
+                placeholder="Es. Sostituzione toner, intervento tecnico esterno…"
+                value={descrizioneCosto}
+                onChange={e => setDescrizioneCosto(e.target.value)}
+              />
+              <button className="btn" type="submit" disabled={salvandoCosto}>
+                {salvandoCosto ? 'Salvataggio…' : 'Aggiungi costo'}
+              </button>
+            </form>
           </div>
         )}
 

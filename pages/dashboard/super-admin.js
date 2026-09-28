@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/router';
 import { supabase } from '../../lib/supabaseClient';
 import { creaClientPerNuovoUtente } from '../../lib/supabaseAdminClient';
 import { useProfile } from '../../lib/useProfile';
@@ -6,6 +7,7 @@ import Navbar from '../../components/Navbar';
 
 export default function DashboardSuperAdmin() {
   const { profile, loading, logout } = useProfile();
+  const router = useRouter();
   const [aziende, setAziende] = useState([]);
   const [nomeAzienda, setNomeAzienda] = useState('');
   const [errore, setErrore] = useState('');
@@ -309,7 +311,16 @@ export default function DashboardSuperAdmin() {
 
   return (
     <div>
-      <Navbar titolo="Assistenza — Super Admin" nome={profile.nome} onLogout={logout} />
+      <Navbar
+        titolo="Assistenza — Super Admin"
+        nome={profile.nome}
+        onLogout={logout}
+        azioneExtra={
+          <button className="btn btn-secondary" onClick={() => router.push('/dashboard/costi')}>
+            💶 Costi
+          </button>
+        }
+      />
       <div className="container">
         {errore && <div className="errore">{errore}</div>}
         {successo && <div className="successo">{successo}</div>}
