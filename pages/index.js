@@ -60,17 +60,19 @@ export default function Login() {
   }
 
   return (
-    <div className="container" style={{ maxWidth: 420, paddingTop: 80 }}>
-      <div className="card">
-        <h1 style={{ marginTop: 0, fontSize: 22 }}>Assistenza Studi</h1>
-        <p style={{ color: '#6b7280', fontSize: 14 }}>Accedi con le credenziali fornite dall'amministrazione.</p>
+    <div className="login-sfondo">
+      <div className="login-card">
+        <img src="/logo.png" alt="TO Smile" className="login-logo" />
+        <p style={{ color: '#6b7280', fontSize: 14, textAlign: 'center', marginTop: 0, marginBottom: 26 }}>
+          Accedi con le credenziali fornite dall'amministrazione.
+        </p>
         {errore && <div className="errore">{errore}</div>}
         <form onSubmit={handleLogin}>
           <label>Email</label>
           <input type="email" value={email} onChange={e => setEmail(e.target.value)} required />
           <label>Password</label>
           <input type="password" value={password} onChange={e => setPassword(e.target.value)} required />
-          <button className="btn" type="submit" disabled={caricando} style={{ width: '100%' }}>
+          <button className="btn" type="submit" disabled={caricando} style={{ width: '100%', padding: '13px 20px', fontSize: 15, marginTop: 4 }}>
             {caricando ? 'Accesso in corso…' : 'Accedi'}
           </button>
         </form>

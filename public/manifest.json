@@ -1,11 +1,11 @@
 {
-  "name": "Assistenza Studi",
-  "short_name": "Assistenza",
-  "description": "Gestione ticket di assistenza tra studi e amministrazione",
+  "name": "TO Smile - Assistenza",
+  "short_name": "TO Smile",
+  "description": "Gestione ticket di assistenza tra studi e amministrazione TO Smile",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f4f5f7",
-  "theme_color": "#2563eb",
+  "background_color": "#FAF9FD",
+  "theme_color": "#8B4FF5",
   "orientation": "portrait-primary",
   "icons": [
     {
