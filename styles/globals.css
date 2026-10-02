@@ -1,12 +1,13 @@
 :root {
-  --viola: #8B4FF5;
-  --viola-scuro: #6D28D9;
+  --viola: #9454FB;
+  --viola-scuro: #7A32E8;
   --viola-chiaro: #F1EBFE;
-  --menta: #1FD8A4;
-  --menta-scuro: #0FA982;
-  --menta-chiara: #E3FBF3;
-  --lime: #D4F81A;
-  --testo: #30303A;
+  --menta: #22D9B5;
+  --menta-scuro: #0FA98A;
+  --menta-chiara: #E1FBF4;
+  --lime: #E3FB19;
+  --grigio-brand: #4D4D4D;
+  --testo: #33333D;
   --testo-chiaro: #6b7280;
   --sfondo: #FAF9FD;
   --bordo: #E8E6F0;
@@ -21,10 +22,14 @@ html, body {
 }
 
 body {
-  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: 'Fredoka', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   background: var(--sfondo);
   color: var(--testo);
   -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, button, .btn, label, .titolo, .badge, .badge-sede {
+  font-weight: 600;
 }
 
 a { color: inherit; }
@@ -120,7 +125,7 @@ label {
 }
 
 .navbar-brand img {
-  height: 34px;
+  height: 38px;
   width: auto;
 }
 
@@ -217,8 +222,8 @@ label {
   justify-content: center;
   padding: 24px;
   background:
-    radial-gradient(circle at 15% 10%, rgba(212, 248, 26, 0.18), transparent 40%),
-    radial-gradient(circle at 85% 90%, rgba(31, 216, 164, 0.16), transparent 45%),
+    radial-gradient(circle at 15% 10%, rgba(227, 251, 25, 0.20), transparent 40%),
+    radial-gradient(circle at 85% 90%, rgba(34, 217, 181, 0.18), transparent 45%),
     linear-gradient(160deg, #F6F2FE 0%, #FAF9FD 50%, #EFFCF8 100%);
 }
 
@@ -228,13 +233,13 @@ label {
   background: var(--bianco);
   border-radius: 20px;
   padding: 36px 32px;
-  box-shadow: 0 12px 40px rgba(139, 79, 245, 0.14);
+  box-shadow: 0 12px 40px rgba(148, 84, 251, 0.14);
   border: 1px solid var(--bordo);
 }
 
 .login-logo {
   display: block;
   margin: 0 auto 18px;
-  height: 84px;
+  height: 108px;
   width: auto;
 }

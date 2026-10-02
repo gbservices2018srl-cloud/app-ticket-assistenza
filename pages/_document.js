@@ -5,7 +5,7 @@ export default function Document() {
     <Html lang="it">
       <Head>
         <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#8B4FF5" />
+        <meta name="theme-color" content="#9454FB" />
         <link rel="icon" href="/icon-192.png" />
         <link rel="apple-touch-icon" href="/icon-192.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -14,7 +14,7 @@ export default function Document() {
         <meta name="description" content="Gestione ticket di assistenza tra studi e amministrazione TO Smile" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="true" />
-        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </Head>
       <body>
         <Main />
