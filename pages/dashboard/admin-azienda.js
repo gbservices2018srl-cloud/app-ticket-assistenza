@@ -5,6 +5,7 @@ import { creaClientPerNuovoUtente } from '../../lib/supabaseAdminClient';
 import { useProfile } from '../../lib/useProfile';
 import { notificheSupportate, statoPermessoNotifiche, richiediPermessoNotifiche, mostraNotifica } from '../../lib/notifiche';
 import Navbar from '../../components/Navbar';
+import { BASE_PATH } from '../../lib/basePath';
 import TicketList from '../../components/TicketList';
 
 const TAB_STATO = [
@@ -201,7 +202,7 @@ export default function DashboardAdminAzienda() {
     setErrore('');
     setSuccesso('');
     const { error } = await supabase.auth.resetPasswordForEmail(utente.email, {
-      redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/reset-password` : undefined,
+      redirectTo: typeof window !== 'undefined' ? `${window.location.origin}${BASE_PATH}/reset-password` : undefined,
     });
     if (error) {
       setErrore('Errore nell\'invio dell\'email di reset: ' + error.message);

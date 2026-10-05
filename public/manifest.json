@@ -2,23 +2,25 @@
   "name": "TO Smile - Assistenza",
   "short_name": "TO Smile",
   "description": "Gestione ticket di assistenza tra studi e amministrazione TO Smile",
-  "start_url": "/",
+  "start_url": "/ticketassistenza/",
   "display": "standalone",
   "background_color": "#FAF9FD",
   "theme_color": "#9454FB",
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/icon-192.png",
+      "src": "/ticketassistenza/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icon-512.png",
+      "src": "/ticketassistenza/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
     }
-  ]
+  ],
+  "id": "/ticketassistenza/",
+  "scope": "/ticketassistenza/"
 }

@@ -1,8 +1,10 @@
+import { BASE_PATH } from '../lib/basePath';
+
 export default function Navbar({ titolo, nome, onLogout, azioneExtra }) {
   return (
     <div className="navbar">
       <div className="navbar-brand">
-        <img src="/logo-mark.png" alt="TO Smile" />
+        <img src={`${BASE_PATH}/logo-mark.png`} alt="TO Smile" />
         <div className="titolo">
           {titolo}
           <small>TO Smile</small>
