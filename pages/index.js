@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { supabase } from '../lib/supabaseClient';
-import { BASE_PATH } from '../lib/basePath';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -63,7 +62,7 @@ export default function Login() {
   return (
     <div className="login-sfondo">
       <div className="login-card">
-        <img src={`${BASE_PATH}/logo.png`} alt="TO Smile" className="login-logo" />
+        <img src="/logo.png" alt="TO Smile" className="login-logo" />
         <p style={{ color: '#6b7280', fontSize: 14, textAlign: 'center', marginTop: 0, marginBottom: 26 }}>
           Accedi con le credenziali fornite dall'amministrazione.
         </p>
