@@ -399,7 +399,7 @@ export default function DashboardSuperAdmin() {
                         ) : (
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
                             <div>
-                              <strong>{adminEspanso === admin.id ? '▾ ' : '▸ '}👤 {admin.nome}</strong>
+                              <strong>{adminEspanso === admin.id ? '▾ ' : '▸ '}👤 {admin.nome}</strong>{admin.figura && <span style={{ fontSize: 13, color: '#6b7280' }}> · {admin.figura}</span>}
                               {admin.email && <div style={{ fontSize: 13, color: '#6b7280' }}>{admin.email}</div>}
                             </div>
                             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} onClick={(e) => e.stopPropagation()}>
@@ -455,7 +455,7 @@ export default function DashboardSuperAdmin() {
                               ) : (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
                                   <div>
-                                    <strong>{u.nome}</strong>
+                                    <strong>{u.nome}</strong>{u.figura && <span style={{ fontSize: 13, color: '#6b7280' }}> · {u.figura}</span>}
                                     {u.email && <div style={{ fontSize: 13, color: '#6b7280' }}>{u.email}</div>}
                                     {u.studi?.nome && <div style={{ fontSize: 13, color: '#6b7280' }}>Sede: {u.studi.nome}</div>}
                                   </div>

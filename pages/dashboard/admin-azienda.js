@@ -336,7 +336,7 @@ export default function DashboardAdminAzienda() {
                 ) : (
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
                     <div>
-                      <strong>{u.nome}</strong>
+                      <strong>{u.nome}</strong>{u.figura && <span style={{ fontSize: 13, color: '#6b7280' }}> · {u.figura}</span>}
                       {u.email && <div style={{ fontSize: 13, color: '#6b7280' }}>{u.email}</div>}
                       {u.studi?.nome && <div style={{ fontSize: 13, color: '#6b7280' }}>Sede: {u.studi.nome}</div>}
                     </div>

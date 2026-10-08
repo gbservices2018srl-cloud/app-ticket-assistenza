@@ -23,12 +23,12 @@ const back = (hash: string) => new Response(null, { status: 302, headers: { Loca
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
 type Ticket = { purpose: "login" | "revoke" | "catalog" | "sync"; email: string; firstName?: string; lastName?: string;
-  role?: "user" | "admin"; livello?: string | null; ente?: string | null; oldEmail?: string | null };
+  role?: "user" | "admin"; livello?: string | null; ente?: string | null; oldEmail?: string | null; figura?: string | null };
 
 type Esito = { ok: boolean; motivo?: string };
 async function applicaLivello(id: string, t: Ticket, email: string): Promise<Esito> {
   const L = String(t.livello || "");
-  const row: Record<string, unknown> = { ruolo: L, azienda_id: null, studio_id: null, email };
+  const row: Record<string, unknown> = { ruolo: L, azienda_id: null, studio_id: null, email, figura: t.figura || null };
   if (L === "admin_azienda") {
     const { data } = await admin.from("aziende").select("id").eq("id", t.ente || "").maybeSingle();
     if (!data) return { ok: false, motivo: "azienda non trovata" };
