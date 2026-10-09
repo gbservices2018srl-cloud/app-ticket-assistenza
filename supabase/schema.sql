@@ -39,6 +39,8 @@ create table if not exists public.profiles (
   creato_da uuid references public.profiles(id) on delete set null,
   creato_il timestamptz not null default now()
 );
+-- figura professionale dall'accesso unico To Smile (Medico, ASO, REC…), scritta dalla funzione "sso"
+alter table public.profiles add column if not exists figura text;
 
 -- ------------------------------------------------------------
 -- 4. TABELLA TICKETS
