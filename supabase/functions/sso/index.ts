@@ -22,9 +22,41 @@ const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE
 const back = (hash: string) => new Response(null, { status: 302, headers: { Location: APP_URL + "#" + hash, "Cache-Control": "no-store" } });
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
-type Ticket = { purpose: "login" | "revoke" | "catalog" | "sync"; email: string; firstName?: string; lastName?: string;
+type Ticket = { purpose: "login" | "revoke" | "catalog" | "sync" | "sedi"; sedi?: Sede[]; email: string; firstName?: string; lastName?: string;
   role?: "user" | "admin"; livello?: string | null; ente?: string | null; oldEmail?: string | null; ssoId?: string | null; figura?: string | null };
 
+type Sede = { id: string; nome: string; sigla: string; email: string; indirizzo: string; societa: string; riuniti: number; attiva: boolean };
+const normSede = (s: unknown) => String(s || "").toLowerCase().replace(/to\s*smile|studio|sede|ambulatorio/g, "").replace(/[^a-z0-9]/g, "");
+// Sedi del gruppo dal pannello accessi → studi di Ticket (nome, indirizzo, azienda = società). Le sedi disattivate restano per lo storico.
+async function copiaSedi(sedi: Sede[]): Promise<string[]> {
+  const avvisi: string[] = [];
+  // deno-lint-ignore no-explicit-any
+  const aziende: any[] = (await admin.from("aziende").select("id, nome")).data || [];
+  // deno-lint-ignore no-explicit-any
+  const studi: any[] = (await admin.from("studi").select("id, nome, azienda_id, central_id")).data || [];
+  for (const x of sedi) {
+    const s = studi.find((r) => r.central_id === x.id) || studi.find((r) => !r.central_id && (normSede(r.nome) === normSede(x.nome) ||
+      (normSede(r.nome).length >= 4 && normSede(x.nome).includes(normSede(r.nome)))));
+    if (!s && !x.attiva) continue;
+    let aziendaId = s?.azienda_id || null;
+    if (x.societa) {
+      let a = aziende.find((z) => String(z.nome).trim().toLowerCase() === x.societa.trim().toLowerCase());
+      if (!a) {
+        const { data, error } = await admin.from("aziende").insert({ nome: x.societa }).select("id, nome").single();
+        if (error || !data) { avvisi.push(`${x.nome}: società non creata (${error?.message})`); continue; }
+        a = data; aziende.push(a);
+      }
+      aziendaId = a.id;
+    }
+    if (!aziendaId && aziende.length === 1) aziendaId = aziende[0].id;
+    if (!aziendaId) { avvisi.push(`${x.nome}: indica la società per crearla in Ticket.`); continue; }
+    const row: Record<string, unknown> = { nome: x.nome, azienda_id: aziendaId, central_id: x.id };
+    if (x.indirizzo) row.indirizzo = x.indirizzo;
+    const { error } = s ? await admin.from("studi").update(row).eq("id", s.id) : await admin.from("studi").insert(row);
+    if (error) avvisi.push(`${x.nome}: ${error.message}`); else if (s) s.central_id = x.id;
+  }
+  return avvisi;
+}
 type Esito = { ok: boolean; motivo?: string };
 async function applicaLivello(id: string, t: Ticket, email: string): Promise<Esito> {
   const L = String(t.livello || "");
@@ -62,12 +94,12 @@ async function utente(email: string, uid: string | null, ssoId?: string | null):
 async function catalogo() {
   const [a, s] = await Promise.all([
     admin.from("aziende").select("id, nome").order("nome"),
-    admin.from("studi").select("id, nome, aziende(nome)").order("nome"),
+    admin.from("studi").select("id, nome, indirizzo, aziende(nome)").order("nome"),
   ]);
   return {
     aziende: (a.data || []).map((x) => ({ id: x.id, nome: x.nome })),
     // deno-lint-ignore no-explicit-any
-    studi: (s.data || []).map((x: any) => ({ id: x.id, nome: x.nome, info: x.aziende?.nome || "" })),
+    studi: (s.data || []).map((x: any) => ({ id: x.id, nome: x.nome, indirizzo: x.indirizzo || "", info: x.aziende?.nome || "" })),
   };
 }
 
@@ -98,6 +130,7 @@ Deno.serve(async (req) => {
   if (!email) return isPost ? json({ error: "email mancante" }, 400) : back("sso_errore=email");
 
   if (t.purpose === "catalog") return json({ enti: await catalogo() });
+  if (t.purpose === "sedi") return json({ ok: true, avvisi: await copiaSedi(t.sedi || []) });
 
   // Chi è: prima per id dell'accesso unico (non cambia mai, nemmeno se cambia l'email), poi per email, poi per la vecchia email
   let uid: string | null = null;
