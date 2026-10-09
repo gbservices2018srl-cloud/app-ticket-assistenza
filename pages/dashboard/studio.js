@@ -42,8 +42,9 @@ export default function DashboardStudio() {
     setErrore('');
     setSuccesso('');
 
-    if (!foto) {
-      setErrore('È obbligatorio allegare una foto per aprire un ticket.');
+    // senza foto la descrizione è obbligatoria e deve spiegare bene il problema
+    if (!foto && descrizione.trim().length < 20) {
+      setErrore('Non hai allegato una foto: scrivi una descrizione dettagliata del problema (almeno 20 caratteri).');
       return;
     }
 
@@ -57,7 +58,7 @@ export default function DashboardStudio() {
         creato_da: profile.id,
         tipo,
         titolo,
-        descrizione,
+        descrizione: descrizione.trim(),
       })
       .select()
       .single();
@@ -119,15 +120,29 @@ export default function DashboardStudio() {
             <label>Titolo</label>
             <input value={titolo} onChange={e => setTitolo(e.target.value)} required />
 
-            <label>Descrizione</label>
-            <textarea rows={4} value={descrizione} onChange={e => setDescrizione(e.target.value)} required />
-
-            <label>Foto (obbligatoria)</label>
+            <label>Foto</label>
+            <div
+              role="note"
+              style={{ background: '#FBF9DA', border: '1px solid #E8E560', borderRadius: 10, padding: '10px 12px', fontSize: 14, margin: '4px 0 10px' }}
+            >
+              <b>Se non hai la foto</b>, la descrizione qui sotto diventa <b>obbligatoria</b>: spiega bene cosa succede, dove e da quando.
+            </div>
             <input
               type="file"
               accept="image/*"
-              onChange={e => setFoto(e.target.files[0])}
-              required
+              onChange={e => setFoto(e.target.files[0] || null)}
+            />
+
+            <label>
+              Descrizione {foto ? '(facoltativa)' : <span style={{ color: '#B3261E' }}>(obbligatoria senza foto)</span>}
+            </label>
+            <textarea
+              rows={4}
+              value={descrizione}
+              onChange={e => setDescrizione(e.target.value)}
+              required={!foto}
+              minLength={foto ? undefined : 20}
+              placeholder={foto ? 'Aggiungi dettagli se servono' : 'Descrivi il problema: cosa succede, dove, da quando'}
             />
 
             <button className="btn" type="submit" disabled={inviando}>
