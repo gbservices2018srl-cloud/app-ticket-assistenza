@@ -23,7 +23,7 @@ const back = (hash: string) => new Response(null, { status: 302, headers: { Loca
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
 type Ticket = { purpose: "login" | "revoke" | "catalog" | "sync" | "sedi"; sedi?: Sede[]; email: string; firstName?: string; lastName?: string;
-  role?: "user" | "admin"; livello?: string | null; ente?: string | null; oldEmail?: string | null; ssoId?: string | null; figura?: string | null };
+  role?: "user" | "admin"; livello?: string | null; ente?: string | null; enti?: string[]; oldEmail?: string | null; ssoId?: string | null; figura?: string | null };
 
 type Sede = { id: string; nome: string; sigla: string; email: string; indirizzo: string; societa: string; riuniti: number; attiva: boolean };
 const normSede = (s: unknown) => String(s || "").toLowerCase().replace(/to\s*smile|studio|sede|ambulatorio/g, "").replace(/[^a-z0-9]/g, "");
@@ -60,15 +60,23 @@ async function copiaSedi(sedi: Sede[]): Promise<string[]> {
 type Esito = { ok: boolean; motivo?: string };
 async function applicaLivello(id: string, t: Ticket, email: string): Promise<Esito> {
   const L = String(t.livello || "");
+  let studiScelti: string[] = [];
   const row: Record<string, unknown> = { ruolo: L, azienda_id: null, studio_id: null, email, figura: t.figura || null };
   if (L === "admin_azienda") {
     const { data } = await admin.from("aziende").select("id").eq("id", t.ente || "").maybeSingle();
     if (!data) return { ok: false, motivo: "azienda non trovata" };
     row.azienda_id = data.id;
   } else if (L === "utente_studio") {
-    const { data } = await admin.from("studi").select("id, azienda_id").eq("id", t.ente || "").maybeSingle();
-    if (!data) return { ok: false, motivo: "studio non trovato" };
-    row.studio_id = data.id; row.azienda_id = data.azienda_id;
+    // più studi: si salvano in profile_studi; nel profilo resta quello "attuale" (la persona lo cambia dal menu in alto)
+    const ids = (t.enti && t.enti.length ? t.enti : [t.ente]).map((x) => String(x || "")).filter(Boolean);
+    if (!ids.length) return { ok: false, motivo: "studio non scelto" };
+    const { data: st } = await admin.from("studi").select("id, azienda_id").in("id", ids);
+    if (!st || st.length !== new Set(ids).size) return { ok: false, motivo: "studio non trovato" };
+    const { data: prima } = await admin.from("profiles").select("studio_id").eq("id", id).maybeSingle();
+    // deno-lint-ignore no-explicit-any
+    const att: any = st.find((x) => x.id === prima?.studio_id) || st.find((x) => x.id === ids[0]);
+    row.studio_id = att.id; row.azienda_id = att.azienda_id;
+    studiScelti = ids;
   } else if (L !== "super_admin") return { ok: false, motivo: "livello sconosciuto" };
   const nome = `${t.firstName || ""} ${t.lastName || ""}`.trim() || email;
   row.nome = nome;
@@ -76,6 +84,11 @@ async function applicaLivello(id: string, t: Ticket, email: string): Promise<Esi
   const { error } = p ? await admin.from("profiles").update(row).eq("id", id)
     : await admin.from("profiles").insert({ id, ...row });
   if (error) { console.error("profilo", error.message); return { ok: false, motivo: error.message }; }
+  await admin.from("profile_studi").delete().eq("profile_id", id);
+  if (studiScelti.length) {
+    const { error: e2 } = await admin.from("profile_studi").insert([...new Set(studiScelti)].map((s) => ({ profile_id: id, studio_id: s })));
+    if (e2) console.error("profile_studi", e2.message);
+  }
   return { ok: true };
 }
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { useProfile } from '../../lib/useProfile';
 import Navbar from '../../components/Navbar';
+import CambioStudio from '../../components/CambioStudio';
 import TicketList from '../../components/TicketList';
 
 export default function DashboardStudio() {
@@ -104,7 +105,7 @@ export default function DashboardStudio() {
 
   return (
     <div>
-      <Navbar titolo="Assistenza — Studio" nome={profile.nome} onLogout={logout} />
+      <Navbar titolo="Assistenza — Studio" nome={profile.nome} onLogout={logout} azioneExtra={<CambioStudio />} />
       <div className="container">
         <div className="card">
           <h2 style={{ marginTop: 0, fontSize: 18 }}>Apri un nuovo ticket</h2>
