@@ -15,7 +15,7 @@ export default function Document() {
         {/* caratteri dai server di appgestione.it (niente Google Fonts) */}
         <link href="https://appgestione.it/fonts/tosmile.css?f=fredoka:400,500,600,700" rel="stylesheet" />
         {/* dopo una modifica la pagina resta dov'era (comune a tutte le app To Smile) */}
-        <script src="https://appgestione.it/static/resta-qui.js?v=1" defer></script>
+        <script src="https://appgestione.it/static/resta-qui.js?v=2" defer></script>
       </Head>
       <body>
         <Main />
