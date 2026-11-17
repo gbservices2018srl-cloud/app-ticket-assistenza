@@ -9,6 +9,7 @@ export default function Navbar({ titolo, nome, onLogout, azioneExtra }) {
         </div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <a className="btn btn-secondary" href="https://appgestione.it/" title="Torna alle tue app" style={{ textDecoration: 'none', whiteSpace: 'nowrap' }}>← Le mie app</a>
         {azioneExtra}
         <span style={{ fontSize: 14, color: '#6b7280' }}>{nome}</span>
         <button className="btn btn-secondary" onClick={onLogout}>Esci</button>
