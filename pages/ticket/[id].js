@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { supabase } from '../../lib/supabaseClient';
 import { useProfile, formattaData } from '../../lib/useProfile';
 import Navbar from '../../components/Navbar';
+import { festaTicketRisolto } from '../../lib/festa';
 
 const ETICHETTE_STATO = {
   aperto: 'Aperto',
@@ -191,10 +192,12 @@ export default function DettaglioTicket() {
       risolto_da: profile.id,
     });
 
-    await supabase
+    const { error: errRisolto } = await supabase
       .from('tickets')
       .update({ stato: 'risolto', risolto_il: new Date().toISOString() })
       .eq('id', id);
+    // riconoscimento a chi ha risolto: festoni e una frase sempre diversa
+    if (!errRisolto) festaTicketRisolto(profile);
 
     setTestoSoluzione('');
     setAggiornando(false);
