@@ -22,7 +22,7 @@ export default function TicketList({ tickets, mostraStudio = false }) {
       {tickets.map(t => (
         <Link href={`/ticket/${t.id}`} key={t.id} className="ticket-item">
           {mostraStudio && t.studi && (
-            <div className="badge-sede">🏢 {t.studi.nome}</div>
+            <div className="badge-sede">🏢 {t.studi.nome}{t.autore?.nome ? ` · 👤 ${t.autore.nome}` : ''}</div>
           )}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: mostraStudio ? 8 : 0 }}>
             <div>

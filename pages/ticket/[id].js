@@ -42,7 +42,7 @@ export default function DettaglioTicket() {
   }, [id, profile]);
 
   async function caricaTutto() {
-    const { data: t } = await supabase.from('tickets').select('*, studi(nome)').eq('id', id).single();
+    const { data: t } = await supabase.from('tickets').select('*, studi(nome), autore:profiles!tickets_creato_da_fkey(nome)').eq('id', id).single();
     setTicket(t);
 
     const { data: a } = await supabase
@@ -242,6 +242,7 @@ export default function DettaglioTicket() {
           <p className="data-apertura" style={{ fontSize: 14, marginBottom: 16 }}>
             <strong>Data apertura:</strong> {formattaData(ticket.creato_il)}
             {ticket.studi && <> — Studio: {ticket.studi.nome}</>}
+            {ticket.autore?.nome && <> — Inviato da: {ticket.autore.nome}</>}
           </p>
 
           <p>{ticket.descrizione}</p>

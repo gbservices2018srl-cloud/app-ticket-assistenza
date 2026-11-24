@@ -98,7 +98,7 @@ export default function DashboardAdminAzienda() {
   async function caricaTickets() {
     let query = supabase
       .from('tickets')
-      .select('*, studi(nome)')
+      .select('*, studi(nome), autore:profiles!tickets_creato_da_fkey(nome)')
       .eq('azienda_id', profile.azienda_id)
       .order('creato_il', { ascending: false });
 
